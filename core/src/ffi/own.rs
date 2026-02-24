@@ -18,11 +18,16 @@ pub extern "C" fn init_rt() -> bool{
     }
 }
 
-#[allow(static_mut_refs)]
 #[unsafe(no_mangle)]
 pub extern "C" fn has_init() -> bool{
     RT.get().is_some()
 }
+
+pub fn spawn_task<F: Future<Output = ()> + Send + 'static>(future: F) {
+    RT.get().unwrap().spawn(future);
+}
+
+
 
 
 // futures
@@ -188,6 +193,12 @@ impl FfiSlice{
             unsafe { Some(Vec::from_raw_parts(self.ptr as *mut u8, self.len, self.cap)) }
         }
     }
+    pub fn to_owned(self) -> Self {
+        if self.owned { self }
+        else {
+            Self::from_vec(self.as_bytes().to_vec())
+        }
+    }
     pub fn as_bytes(&self) -> &[u8]{
         unsafe { slice::from_raw_parts(self.ptr, self.len) }
     }
@@ -242,6 +253,22 @@ impl Drop for FfiSlice{
     }
 }
 
+pub trait ToFfiSlice {
+    fn to_ffi_slice(self) -> FfiSlice;
+}
+pub trait AsFfiSlice {
+    fn as_ffi_slice(&self) -> FfiSlice;
+}
+impl<I: Into<FfiSlice>> ToFfiSlice for I {
+    fn to_ffi_slice(self) -> FfiSlice {
+        self.into()
+    }
+}
+impl<I: AsRef<[u8]>> AsFfiSlice for I {
+    fn as_ffi_slice(&self) -> FfiSlice {
+        self.as_ref().into()
+    }
+}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn free_slice(slice: FfiSlice) {

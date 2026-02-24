@@ -267,7 +267,7 @@ dependencies = [
 
 [[package]]
 name = "httplib"
-version = "3.1.1"
+version = "3.1.2"
 dependencies = [
  "dashmap",
  "http",
@@ -282,7 +282,7 @@ dependencies = [
 
 [[package]]
 name = "httprs_core"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "tokio",
 ]

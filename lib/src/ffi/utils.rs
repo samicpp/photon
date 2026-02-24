@@ -1,10 +1,10 @@
 use core::ffi::c_void;
 use std::ptr;
 
-use httprs_core::ffi::{futures::FfiFuture, own::{FfiSlice, RT}};
+use httprs_core::ffi::{futures::FfiFuture, own::FfiSlice};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::{DynStream, errno::{Errno, TYPE_ERR}};
+use crate::{DynStream, errno::TYPE_ERR, spawn_task_with};
 
 
 pub fn heap_ptr<T>(thing: T) -> *mut T{
@@ -38,21 +38,18 @@ pub extern "C" fn create_duplex(bufsize: usize) -> FfiDuoStream {
 #[unsafe(no_mangle)]
 pub extern "C" fn tcp_peek(fut: *mut FfiFuture, ffi: *mut DynStream, buf: *mut FfiSlice){
     unsafe {
-        let ffi = &mut *ffi;
+        let ffi = &*ffi;
         let fut = &*fut;
         let buf = (*buf).as_bytes_mut();
 
-        RT.get().unwrap().spawn(async move {
-            if let DynStream::Tcp(tcp) = ffi {
-                match tcp.peek(buf).await {
-                    Ok(size) => fut.complete(heap_void_ptr(size)),
-                    Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-                }
-            }
-            else{
-                fut.cancel_with_err(TYPE_ERR, "socket not tcp".into())
-            }
-        });
+        if let DynStream::Tcp(tcp) = ffi {
+            spawn_task_with(fut, async move {
+                Ok(heap_void_ptr(tcp.peek(buf).await))
+            });
+        }
+        else{
+            fut.cancel_with_err(TYPE_ERR, "socket not tcp".into())
+        }
     }
 }
 
@@ -63,11 +60,8 @@ pub extern "C" fn stream_read(fut: *mut FfiFuture, stream: *mut DynStream, buf: 
         let fut = &*fut;
         let buf = (*buf).as_bytes_mut();
 
-        RT.get().unwrap().spawn(async move {
-            match stream.read(buf).await {
-                Ok(size) => fut.complete(heap_void_ptr(size)),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move {
+            Ok(heap_void_ptr(stream.read(buf).await))
         });
     }
 }
@@ -77,13 +71,10 @@ pub extern "C" fn stream_write(fut: *mut FfiFuture, stream: *mut DynStream, buf:
     unsafe {
         let stream = &mut *stream;
         let fut = &*fut;
-        let buf = (*buf).as_bytes_mut();
+        let buf = (*buf).as_bytes();
 
-        RT.get().unwrap().spawn(async move {
-            match stream.write(buf).await {
-                Ok(size) => fut.complete(heap_void_ptr(size)),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move {
+            Ok(heap_void_ptr(stream.write(buf).await))
         });
     }
 }
@@ -94,11 +85,35 @@ pub extern "C" fn stream_write_all(fut: *mut FfiFuture, stream: *mut DynStream, 
         let fut = &*fut;
         let buf = (*buf).as_bytes_mut();
 
-        RT.get().unwrap().spawn(async move {
-            match stream.write_all(buf).await {
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move {
+            stream.write_all(buf).await?;
+            Ok(ptr::null_mut())
+        });
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn stream_flush(fut: *mut FfiFuture, stream: *mut DynStream){
+    unsafe {
+        let stream = &mut *stream;
+        let fut = &*fut;
+
+        spawn_task_with(fut, async move {
+            stream.flush().await?;
+            Ok(ptr::null_mut())
+        });
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn stream_shutdown(fut: *mut FfiFuture, stream: *mut DynStream){
+    unsafe {
+        let stream = &mut *stream;
+        let fut = &*fut;
+
+        spawn_task_with(fut, async move {
+            stream.shutdown().await?;
+            Ok(ptr::null_mut())
         });
     }
 }

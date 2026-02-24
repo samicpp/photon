@@ -1,10 +1,10 @@
 use std::{ffi::CStr, ptr, sync::Arc};
 
-use httprs_core::ffi::{futures::FfiFuture, own::{FfiSlice, RT}};
+use httprs_core::ffi::{futures::FfiFuture, own::FfiSlice};
 use rustls::{ServerConfig, pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject}, sign::CertifiedKey};
 use tokio_rustls::TlsAcceptor;
 
-use crate::{DynStream, PROVIDER, errno::{Errno, TYPE_ERR}, ffi::utils::heap_void_ptr, servers::TlsCertSelector};
+use crate::{DynStream, PROVIDER, ffi::utils::heap_void_ptr, servers::TlsCertSelector, spawn_task_with};
 
 
 
@@ -95,9 +95,9 @@ pub extern "C" fn tls_config_free(conf: *const ServerConfig) {
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_upgrade_tls(fut: *mut FfiFuture, ffi: *mut DynStream, conf: *const ServerConfig){
+pub extern "C" fn tcp_upgrade_tls(fut: *mut FfiFuture, stream: *mut DynStream, conf: *const ServerConfig){
     unsafe {
-        let ffi = *Box::from_raw(ffi);
+        let stream = *Box::from_raw(stream);
         let fut = &*fut;
         let con = {
             Arc::increment_strong_count(conf);
@@ -105,19 +105,22 @@ pub extern "C" fn tcp_upgrade_tls(fut: *mut FfiFuture, ffi: *mut DynStream, conf
         };
         let acc = TlsAcceptor::from(con);
 
-        RT.get().unwrap().spawn(async move {
-            if let DynStream::Tcp(tcp) = ffi {
-                match acc.accept(tcp).await {
-                    Ok(tls) => {
-                        let stream: DynStream = tls.into();
-                        fut.complete(heap_void_ptr(stream));
-                    },
-                    Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-                }
+        spawn_task_with(fut, async move {
+            match stream {
+                DynStream::Tcp(tcp) => {
+                    let tls = acc.accept(tcp).await?;
+                    let stream: DynStream = tls.into();
+                    Ok(heap_void_ptr(stream))
+                },
+                DynStream::Duplex(dup) => {
+                    let tls = acc.accept(dup).await?;
+                    let stream: DynStream = tls.into();
+                    Ok(heap_void_ptr(stream))
+                },
+                _ => {
+                    Ok(heap_void_ptr(stream))
+                },
             }
-            else{
-                fut.cancel_with_err(TYPE_ERR, "socket not tcp".into())
-            }
-        });
+        })
     }
 }

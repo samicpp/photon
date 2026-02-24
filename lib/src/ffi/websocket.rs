@@ -1,11 +1,11 @@
 use std::ptr;
 
-use httprs_core::ffi::{futures::FfiFuture, own::{FfiSlice, RT}};
+use httprs_core::ffi::{futures::FfiFuture, own::FfiSlice};
 use tokio::io::{BufReader, ReadHalf, WriteHalf};
 
 use http::{shared::Stream, websocket::{core::WebSocketFrame, socket::WebSocket}};
 
-use crate::{errno::Errno, ffi::utils::heap_void_ptr};
+use crate::{ffi::utils::heap_void_ptr, spawn_task_with};
 
 
 pub type DynWebSocket = WebSocket<BufReader<ReadHalf<Box<dyn Stream>>>, WriteHalf<Box<dyn Stream>>>;
@@ -39,11 +39,8 @@ pub extern "C" fn websocket_read_frame(fut: *mut FfiFuture, ws: *mut DynWebSocke
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.read_frame().await{
-                Ok(frame) => fut.complete(heap_void_ptr(FfiWsFrame::from_owned(frame))),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            Ok(heap_void_ptr(FfiWsFrame::from_owned(ws.read_frame().await?)))
         });
     }
 }
@@ -59,11 +56,9 @@ pub extern "C" fn websocket_flush(fut: *mut FfiFuture, ws: *mut DynWebSocket){
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.flush().await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.flush().await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -82,11 +77,9 @@ pub extern "C" fn websocket_send_continuation(fut: *mut FfiFuture, ws: *mut DynW
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_continuation(buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_continuation(buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -98,11 +91,9 @@ pub extern "C" fn websocket_send_continuation_masked(fut: *mut FfiFuture, ws: *m
         let mut mask = [0u8; 4];
         rand::fill(&mut mask);
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_continuation_masked(&mask, buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_continuation_masked(&mask, buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -112,11 +103,9 @@ pub extern "C" fn websocket_send_continuation_frag(fut: *mut FfiFuture, ws: *mut
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_continuation_frag(buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_continuation_frag(buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -128,11 +117,9 @@ pub extern "C" fn websocket_send_continuation_masked_frag(fut: *mut FfiFuture, w
         let mut mask = [0u8; 4];
         rand::fill(&mut mask);
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_continuation_masked_frag(&mask, buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_continuation_masked_frag(&mask, buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -143,11 +130,9 @@ pub extern "C" fn websocket_send_text(fut: *mut FfiFuture, ws: *mut DynWebSocket
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_text(buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_text(buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -159,11 +144,9 @@ pub extern "C" fn websocket_send_text_masked(fut: *mut FfiFuture, ws: *mut DynWe
         let mut mask = [0u8; 4];
         rand::fill(&mut mask);
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_text_masked(&mask, buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_text_masked(&mask, buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -173,11 +156,9 @@ pub extern "C" fn websocket_send_text_frag(fut: *mut FfiFuture, ws: *mut DynWebS
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_text_frag(buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_text_frag(buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -189,11 +170,9 @@ pub extern "C" fn websocket_send_text_masked_frag(fut: *mut FfiFuture, ws: *mut 
         let mut mask = [0u8; 4];
         rand::fill(&mut mask);
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_text_masked_frag(&mask, buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_text_masked_frag(&mask, buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -204,11 +183,9 @@ pub extern "C" fn websocket_send_binary(fut: *mut FfiFuture, ws: *mut DynWebSock
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_binary(buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_binary(buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -220,11 +197,9 @@ pub extern "C" fn websocket_send_binary_masked(fut: *mut FfiFuture, ws: *mut Dyn
         let mut mask = [0u8; 4];
         rand::fill(&mut mask);
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_binary_masked(&mask, buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_binary_masked(&mask, buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -234,11 +209,9 @@ pub extern "C" fn websocket_send_binary_frag(fut: *mut FfiFuture, ws: *mut DynWe
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_binary_frag(buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_binary_frag(buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -250,11 +223,9 @@ pub extern "C" fn websocket_send_binary_masked_frag(fut: *mut FfiFuture, ws: *mu
         let mut mask = [0u8; 4];
         rand::fill(&mut mask);
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_binary_masked_frag(&mask, buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_binary_masked_frag(&mask, buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -265,11 +236,9 @@ pub extern "C" fn websocket_send_close(fut: *mut FfiFuture, ws: *mut DynWebSocke
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_close(code, buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_close(code, buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -281,11 +250,9 @@ pub extern "C" fn websocket_send_close_masked(fut: *mut FfiFuture, ws: *mut DynW
         let mut mask = [0u8; 4];
         rand::fill(&mut mask);
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_close_masked(&mask, code, buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_close_masked(&mask, code, buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -296,11 +263,9 @@ pub extern "C" fn websocket_send_ping(fut: *mut FfiFuture, ws: *mut DynWebSocket
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_ping(buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_ping(buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -312,11 +277,9 @@ pub extern "C" fn websocket_send_ping_masked(fut: *mut FfiFuture, ws: *mut DynWe
         let mut mask = [0u8; 4];
         rand::fill(&mut mask);
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_ping_masked(&mask, buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_ping_masked(&mask, buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -326,11 +289,9 @@ pub extern "C" fn websocket_send_pong(fut: *mut FfiFuture, ws: *mut DynWebSocket
         let ws = &mut *ws;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_pong(buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_pong(buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -342,11 +303,9 @@ pub extern "C" fn websocket_send_pong_masked(fut: *mut FfiFuture, ws: *mut DynWe
         let mut mask = [0u8; 4];
         rand::fill(&mut mask);
 
-        RT.get().unwrap().spawn(async move{
-            match ws.send_pong_masked(&mask, buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            ws.send_pong_masked(&mask, buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }

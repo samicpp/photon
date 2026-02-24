@@ -30,23 +30,23 @@ where
 
 pub type DynHttpSocket = PolyHttpSocket<ReadHalf<DynStream>, WriteHalf<DynStream>>;
 
-pub struct TcpServer{
-    // cb: Arc<dyn Fn(SocketAddr, PolyHttpSocket<ReadHalf<TcpStream>, WriteHalf<TcpStream>>) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + Sync + 'static>,
-    listener: TcpListener,
-}
-impl TcpServer{
-    pub async fn new(address: String) -> std::io::Result<Self>{
-        Ok(Self {
-            listener: TcpListener::bind(address).await?,
-        })
-    }
-    pub async fn accept(&mut self) -> io::Result<(SocketAddr, TcpStream)> {
-            let (sock, addr) = self.listener.accept().await?;
-            // let http = Http1Socket::new(sock, 8 * 1024);
-            // let http = PolyHttpSocket::Http1(http);
-            Ok((addr, sock))
-    }
-}
+// pub struct TcpServer{
+//     // cb: Arc<dyn Fn(SocketAddr, PolyHttpSocket<ReadHalf<TcpStream>, WriteHalf<TcpStream>>) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + Sync + 'static>,
+//     listener: TcpListener,
+// }
+// impl TcpServer{
+//     pub async fn new(address: String) -> std::io::Result<Self>{
+//         Ok(Self {
+//             listener: TcpListener::bind(address).await?,
+//         })
+//     }
+//     pub async fn accept(&mut self) -> io::Result<(SocketAddr, TcpStream)> {
+//             let (sock, addr) = self.listener.accept().await?;
+//             // let http = Http1Socket::new(sock, 8 * 1024);
+//             // let http = PolyHttpSocket::Http1(http);
+//             Ok((addr, sock))
+//     }
+// }
 
 pub async fn detect_prot(tcp: &mut TcpStream) -> u8{
     let mut peek = [0u8; 24];

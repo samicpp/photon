@@ -1,10 +1,10 @@
-use std::{ffi::{CStr, c_void}, net::SocketAddr, ptr};
+use std::{ffi::CStr, net::SocketAddr, ptr};
 
 use http::{http1::server::Http1Socket, shared::{HttpClient, HttpMethod, HttpSocket, HttpType, HttpVersion}};
-use httprs_core::ffi::{futures::FfiFuture, own::{FfiSlice, RT}};
-use tokio::io::AsyncWriteExt;
+use httprs_core::ffi::{futures::FfiFuture, own::{FfiSlice, spawn_task}};
+use tokio::{io::AsyncWriteExt, net::TcpListener};
 
-use crate::{DynStream, errno::{Errno, TYPE_ERR}, ffi::utils::{heap_ptr, heap_void_ptr}, servers::{DynHttpSocket, TcpServer, detect_prot}};
+use crate::{DynStream, errno::{Errno, TYPE_ERR}, ffi::utils::{heap_ptr, heap_void_ptr}, servers::{DynHttpSocket, detect_prot}, spawn_task_with};
 
 
 #[repr(C)]
@@ -131,41 +131,33 @@ pub extern "C" fn tcp_server_new(fut: *mut FfiFuture, string: *mut i8){
         let addr = CStr::from_ptr(string).to_string_lossy().to_string();
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move {
-            match TcpServer::new(addr).await{
-                Ok(server) => fut.complete(heap_void_ptr(server)),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move {
+            let lis = TcpListener::bind(addr).await?;
+            Ok(heap_void_ptr(lis))
         });
     }
 }
 
 // #[allow(improper_ctypes_definitions)]
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_server_accept(fut: *mut FfiFuture, server: *mut TcpServer){
+pub extern "C" fn tcp_server_accept(fut: *mut FfiFuture, server: *mut TcpListener){
     unsafe {
         let server = &mut *server;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move {
-            match server.accept().await{
-                Ok((addr, sock)) => {
-                    // let boxed = Box::new(http);
-                    // let ptr = Box::into_raw(boxed);
-                    let sock = sock.into();
-                    let sock = heap_ptr(sock);
+        spawn_task_with(fut, async move {
+            let (sock, addr) = server.accept().await?;
+            let sock = sock.into();
+            let sock = heap_ptr(sock);
 
-                    let addr = heap_ptr(addr);
+            let addr = heap_ptr(addr);
 
-                    let ffi = FfiBundle {
-                        sock,
-                        addr,
-                    };
+            let ffi = FfiBundle {
+                sock,
+                addr,
+            };
 
-                    fut.complete(heap_void_ptr(ffi))
-                },
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+            Ok(heap_void_ptr(ffi))
         });
     }
 }
@@ -176,7 +168,7 @@ pub extern "C" fn tcp_server_accept(fut: *mut FfiFuture, server: *mut TcpServer)
         let mut ser = Box::from_raw(server);
         let fut = Box::from_raw(fut);
 
-        RT.get().unwrap().spawn(async move {
+        spawn_task(async move {
             loop {
                 match ser.boxed.accept().await{
                     Ok((addr, sock)) => cb(Box::into_raw(Box::new(FfiBundle { sock, addr }))),
@@ -213,15 +205,17 @@ pub extern "C" fn get_addr_str(addr: *const SocketAddr) -> FfiSlice{
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_detect_prot(fut: *mut FfiFuture, ffi: *mut DynStream){
+pub extern "C" fn tcp_detect_prot(fut: *mut FfiFuture, stream: *mut DynStream){
     unsafe {
-        let ffi = &mut *ffi;
+        let stream = &mut *stream;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move {
-            match ffi {
-                DynStream::Tcp(tcp) => fut.complete(detect_prot(tcp).await as *mut c_void),
-                _ => fut.cancel_with_err(TYPE_ERR, "socket not tcp".into()),
+        spawn_task(async move {
+            if let DynStream::Tcp(tcp) = stream {
+                fut.complete(heap_void_ptr(detect_prot(tcp).await))
+            }
+            else {
+                fut.cancel_with_err(TYPE_ERR, "socket not tcp".into())
             }
         });
     }
@@ -254,11 +248,9 @@ pub extern "C" fn http_read_client(fut: *mut FfiFuture, http: *mut DynHttpSocket
         let http = &mut *http;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match http.read_client().await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            http.read_client().await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -268,11 +260,9 @@ pub extern "C" fn http_read_until_complete(fut: *mut FfiFuture, http: *mut DynHt
         let http = &mut *http;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match http.read_until_complete().await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            http.read_until_complete().await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -282,11 +272,9 @@ pub extern "C" fn http_read_until_head_complete(fut: *mut FfiFuture, http: *mut 
         let http = &mut *http;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match http.read_until_head_complete().await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            http.read_until_head_complete().await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -322,11 +310,10 @@ pub extern "C" fn http_write(fut: *mut FfiFuture, http: *mut DynHttpSocket, buf:
     unsafe{
         let http = &mut *http;
         let fut = &*fut;
-        RT.get().unwrap().spawn(async move{
-            match http.write(buf.as_bytes()).await{
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+
+        spawn_task_with(fut, async move{
+            http.write(buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -336,17 +323,9 @@ pub extern "C" fn http_close(fut: *mut FfiFuture, http: *mut DynHttpSocket, buf:
         let http = &mut *http;
         let fut = &*fut;
 
-        RT.get().unwrap().spawn(async move{
-            match http.close(buf.as_bytes()).await{
-                Ok(_) => {
-                    // println!("normal closure");
-                    fut.complete(ptr::null_mut())
-                },
-                Err(e) => {
-                    // dbg!(e);
-                    fut.cancel_with_err(e.get_errno(), e.to_string().into());
-                },
-            }
+        spawn_task_with(fut, async move{
+            http.close(buf.as_bytes()).await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -355,11 +334,9 @@ pub extern "C" fn http_flush(fut: *mut FfiFuture, http: *mut DynHttpSocket){
     unsafe{
         let fut = &*fut;
         let http = &mut *http;
-        RT.get().unwrap().spawn(async move{
-            match http.flush().await {
-                Ok(_) => fut.complete(ptr::null_mut()),
-                Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-            }
+        spawn_task_with(fut, async move{
+            http.flush().await?;
+            Ok(ptr::null_mut())
         });
     }
 }
@@ -459,7 +436,7 @@ pub extern "C" fn http1_direct_write(fut: *mut FfiFuture, http: *mut DynHttpSock
     unsafe{
         let http = &mut *http;
         let fut = &*fut;
-        RT.get().unwrap().spawn(async move{
+        spawn_task(async move{
             match http {
                 DynHttpSocket::Http1(one) => {
                     match one.netw.write_all(buf.as_bytes()).await {
@@ -476,55 +453,52 @@ pub extern "C" fn http1_direct_write(fut: *mut FfiFuture, http: *mut DynHttpSock
 #[unsafe(no_mangle)]
 pub extern "C" fn http1_websocket(fut: *mut FfiFuture, http: *mut DynHttpSocket){
     unsafe{
-        let http = Box::from_raw(http);
+        let http = *Box::from_raw(http);
         let fut = &*fut;
-        RT.get().unwrap().spawn(async move{
-            match *http {
-                DynHttpSocket::Http1(one) => {
-                    match one.websocket().await {
-                        Ok(ws) => fut.complete(heap_void_ptr(ws)),
-                        Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-                    }
-                }
-                _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),
+        
+        match http {
+            DynHttpSocket::Http1(one) => {
+                spawn_task_with(fut, async move {
+                    let ws = one.websocket().await?;
+                    Ok(heap_void_ptr(ws))
+                })
             }
-        });
+            _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn http1_h2c(fut: *mut FfiFuture, http: *mut DynHttpSocket){
     unsafe{
-        let http = Box::from_raw(http);
+        let http = *Box::from_raw(http);
         let fut = &*fut;
-        RT.get().unwrap().spawn(async move{
-            match *http {
-                DynHttpSocket::Http1(one) => {
-                    match one.h2c(None).await {
-                        Ok(ws) => fut.complete(heap_void_ptr(ws)),
-                        Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-                    }
-                }
-                _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),
+        
+        match http {
+            DynHttpSocket::Http1(one) => {
+                spawn_task_with(fut, async move {
+                    let h2 = one.h2c(None).await?;
+                    Ok(heap_void_ptr(h2))
+                })
             }
-        });
+            _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),
+        }
     }
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn http1_h2_prior_knowledge(fut: *mut FfiFuture, http: *mut DynHttpSocket){
     unsafe{
-        let http = Box::from_raw(http);
+        let http = *Box::from_raw(http);
         let fut = &*fut;
-        RT.get().unwrap().spawn(async move{
-            match *http {
-                DynHttpSocket::Http1(one) => {
-                    match one.http2_prior_knowledge().await {
-                        Ok(ws) => fut.complete(heap_void_ptr(ws)),
-                        Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
-                    }
-                }
-                _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),
+
+        match http {
+            DynHttpSocket::Http1(one) => {
+                spawn_task_with(fut, async move {
+                    let h2 = one.http2_prior_knowledge().await?;
+                    Ok(heap_void_ptr(h2))
+                })
             }
-        });
+            _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),
+        }
     }
 }

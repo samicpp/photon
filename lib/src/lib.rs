@@ -1,9 +1,12 @@
-use std::{pin::Pin, sync::{Arc, LazyLock}};
+use std::{ffi::c_void, pin::Pin, sync::{Arc, LazyLock}};
 
-use http::shared::Stream;
+use http::shared::{LibError, Stream};
+use httprs_core::ffi::{futures::FfiFuture, own::spawn_task};
 use rustls::crypto::CryptoProvider;
 use tokio::{io::{AsyncRead, AsyncWrite, DuplexStream}, net::TcpStream};
 use tokio_rustls::TlsStream;
+
+use crate::errno::Errno;
 
 pub mod tests;
 pub mod servers;
@@ -20,6 +23,7 @@ pub enum DynStream {
     Tcp(TcpStream),
     TcpTls(TlsStream<TcpStream>),
     Duplex(DuplexStream),
+    TlsDuplex(TlsStream<DuplexStream>),
 }
 impl DynStream{
     pub fn to_stream(self) -> Box<dyn Stream>{
@@ -27,6 +31,7 @@ impl DynStream{
             Self::Tcp(tcp) => Box::new(tcp),
             Self::TcpTls(tls) => Box::new(tls),
             Self::Duplex(dup) => Box::new(dup),
+            Self::TlsDuplex(dup) => Box::new(dup),
         }
     }
 
@@ -34,12 +39,16 @@ impl DynStream{
         if let Self::Tcp(_) = self { true }
         else { false }
     }
-    pub fn is_tls(&self) -> bool {
+    pub fn is_tcp_tls(&self) -> bool {
         if let Self::TcpTls(_) = self { true }
         else { false }
     }
     pub fn is_duplex(&self) -> bool {
         if let Self::Duplex(_) = self { true }
+        else { false }
+    }
+    pub fn is_tls_duplex(&self) -> bool {
+        if let Self::TlsDuplex(_) = self { true }
         else { false }
     }
 }
@@ -68,6 +77,21 @@ impl From<DuplexStream> for DynStream{
         Self::Duplex(value)
     }
 }
+impl From<TlsStream<DuplexStream>> for DynStream{
+    fn from(value: TlsStream<DuplexStream>) -> Self {
+        Self::TlsDuplex(value)
+    }
+}
+impl From<tokio_rustls::client::TlsStream<DuplexStream>> for DynStream{
+    fn from(value: tokio_rustls::client::TlsStream<DuplexStream>) -> Self {
+        Self::TlsDuplex(TlsStream::Client(value))
+    }
+}
+impl From<tokio_rustls::server::TlsStream<DuplexStream>> for DynStream{
+    fn from(value: tokio_rustls::server::TlsStream<DuplexStream>) -> Self {
+        Self::TlsDuplex(TlsStream::Server(value))
+    }
+}
 impl AsyncRead for DynStream {
     fn poll_read(
             self: std::pin::Pin<&mut Self>,
@@ -79,6 +103,7 @@ impl AsyncRead for DynStream {
                 Self::Tcp(tcp) => Pin::new_unchecked(tcp).poll_read(cx, buf),
                 Self::TcpTls(tls) => Pin::new_unchecked(tls).poll_read(cx, buf),
                 Self::Duplex(dup) => Pin::new_unchecked(dup).poll_read(cx, buf),
+                Self::TlsDuplex(dup) => Pin::new_unchecked(dup).poll_read(cx, buf),
             }
         }
     }
@@ -90,6 +115,7 @@ impl AsyncWrite for DynStream {
                 Self::Tcp(tcp) => Pin::new_unchecked(tcp).poll_flush(cx),
                 Self::TcpTls(tls) => Pin::new_unchecked(tls).poll_flush(cx),
                 Self::Duplex(dup) => Pin::new_unchecked(dup).poll_flush(cx),
+                Self::TlsDuplex(dup) => Pin::new_unchecked(dup).poll_flush(cx),
             }
         }
     }
@@ -99,6 +125,7 @@ impl AsyncWrite for DynStream {
                 Self::Tcp(tcp) => Pin::new_unchecked(tcp).poll_shutdown(cx),
                 Self::TcpTls(tls) => Pin::new_unchecked(tls).poll_shutdown(cx),
                 Self::Duplex(dup) => Pin::new_unchecked(dup).poll_shutdown(cx),
+                Self::TlsDuplex(dup) => Pin::new_unchecked(dup).poll_shutdown(cx),
             }
         }
     }
@@ -112,6 +139,7 @@ impl AsyncWrite for DynStream {
                 Self::Tcp(tcp) => Pin::new_unchecked(tcp).poll_write(cx, buf),
                 Self::TcpTls(tls) => Pin::new_unchecked(tls).poll_write(cx, buf),
                 Self::Duplex(dup) => Pin::new_unchecked(dup).poll_write(cx, buf),
+                Self::TlsDuplex(dup) => Pin::new_unchecked(dup).poll_write(cx, buf),
             }
         }
     }
@@ -125,6 +153,7 @@ impl AsyncWrite for DynStream {
                 Self::Tcp(tcp) => Pin::new_unchecked(tcp).poll_write_vectored(cx, bufs),
                 Self::TcpTls(tls) => Pin::new_unchecked(tls).poll_write_vectored(cx, bufs),
                 Self::Duplex(dup) => Pin::new_unchecked(dup).poll_write_vectored(cx, bufs),
+                Self::TlsDuplex(dup) => Pin::new_unchecked(dup).poll_write_vectored(cx, bufs),
             }
         }
     }
@@ -133,6 +162,16 @@ impl AsyncWrite for DynStream {
             Self::Tcp(tcp) => tcp.is_write_vectored(),
             Self::TcpTls(tls) => tls.is_write_vectored(),
             Self::Duplex(dup) => dup.is_write_vectored(),
+            Self::TlsDuplex(dup) => dup.is_write_vectored(),
         }
     }
+}
+
+pub fn spawn_task_with<F: Future<Output = Result<*mut c_void, LibError>> + Send + 'static>(fut: &'static FfiFuture, future: F) {
+    spawn_task(async move {
+        match future.await {
+            Ok(ptr) => fut.complete(ptr),
+            Err(e) => fut.cancel_with_err(e.get_errno(), e.to_string().into()),
+        }
+    });
 }

@@ -5,15 +5,15 @@
 use std::{net::{SocketAddr, ToSocketAddrs}, sync::{Arc, atomic::AtomicBool}, time::Duration};
 use http::{extra::PolyHttpSocket, http1::{client::Http1Request, server::Http1Socket}, http2::{core::Http2Settings, session::Http2Session}, shared::{HttpRequest, HttpSocket, HttpVersion, LibError, ReadStream, WriteStream}, websocket::{core::WebSocketOpcode, socket::WebSocket}};
 use tokio::{io::AsyncReadExt, net::TcpListener, sync::Mutex};
-use crate::{clients::{tcp_connect, tls_upgrade}, /*httpcpp::server_test,*/ servers::{TcpServer, tcp_serve}};
+use crate::{clients::{tcp_connect, tls_upgrade}, /*httpcpp::server_test,*/ servers::tcp_serve};
 
 
 #[ignore = "requires user input"]
 #[tokio::test]
 async fn serve_tcp(){
     // tcp_serve("0.0.0.0:1024".to_owned(), |a,h| handler(a,h)).await.unwrap();
-    let mut tcp = TcpServer::new("0.0.0.0:1024".to_owned()).await.unwrap();
-    let (addr, sock) = tcp.accept().await.unwrap();
+    let tcp = TcpListener::bind("0.0.0.0:1024".to_owned()).await.unwrap();
+    let (sock, addr) = tcp.accept().await.unwrap();
     let mut http = Http1Socket::new(sock, 8 * 1024);
     // let mut http = PolyHttpSocket::Http1(http);
     
