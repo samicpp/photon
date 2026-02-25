@@ -47,6 +47,8 @@ pub struct Http2Data {
     pub promising: Option<u32>, 
     pub promise: Vec<u8>,
     pub push_headers: Vec<(Vec<u8>, Vec<u8>)>,
+
+    pub own_window: Option<SyncMutex<usize>>,
 }
 impl Http2Data {
     pub fn empty(stream_id: u32, sett: Http2Settings) -> Self {
@@ -70,6 +72,7 @@ impl Http2Data {
             promising: None,
             promise: Vec::new(),
             push_headers: Vec::new(),
+            own_window: None,
         }
     }
 }
@@ -94,6 +97,10 @@ pub struct Http2Session<R: ReadStream, W: WriteStream>{
     pub notify: Notify,
 
     pub settings: SyncMutex<Http2Settings>,
+
+    // TODO: force other side to respect settings & flow control
+    pub own_settings: Option<SyncMutex<Http2Settings>>,
+    pub own_window: Option<SyncMutex<usize>>,
 }
 impl<S: Stream> Http2Session<ReadHalf<S>, WriteHalf<S>> {
     pub fn new(net: S) -> Self {
@@ -124,7 +131,9 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
             goaway_frame: SyncMutex::new(None),
             window: SyncMutex::new(settings.initial_window_size.unwrap_or(65535) as usize),
             notify: Notify::new(),
-            settings: SyncMutex::new(settings)
+            settings: SyncMutex::new(settings),
+            own_settings: None,
+            own_window: None,
         }
     }
 
@@ -215,7 +224,7 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
 
 
     pub async fn handle(&self, frame: Http2Frame) -> LibResult<Option<u32>> {
-        // strict check wether frame fields are valid, e.g. allowed flags
+        // TODO: strict check wether frame fields are valid, e.g. allowed flags
 
         {
             let mut msid = self.max_stream_id.lock().unwrap();
@@ -227,7 +236,7 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
         match frame.ftype {
             Http2FrameType::Data => {                
                 if let Some(mut shard) = self.streams.get_mut(&frame.stream_id) {
-                    // strict check wether closed
+                    // TODO: strict check wether closed
 
                     shard.body.extend_from_slice(frame.get_payload());
                     
@@ -248,8 +257,8 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
             Http2FrameType::Headers => {
                 let mut decoder = self.decoder.lock().await;
                 match self.streams.get_mut(&frame.stream_id) {
-                    // allow leading or trailing non opening headers
-                    // strict verify that this is the case
+                    // TODO: allow leading or trailing non opening headers
+                    // TODO: strict verify that this is the case
                     Some(mut shard) if self.mode.is_client() || self.mode.is_ambiguous() => {
 
                         shard.head.extend_from_slice(frame.get_payload());
@@ -302,7 +311,7 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
                 }
             },
             Http2FrameType::Settings => {
-                // strict only allow known settings (1 - 6) and stream_id == 0
+                // TODO: strict only allow known settings (1 - 6) and stream_id == 0
                 if !frame.is_ack() {
                     {
                         let sett = Http2Settings::from(frame.get_payload());
@@ -324,7 +333,7 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
             Http2FrameType::PushPromise => {
                 let pay = frame.get_payload();
 
-                // strict verify associated stream exists
+                // TODO: strict verify associated stream exists
                 if (self.mode.is_client() || self.mode.is_ambiguous()) && pay.len() >= 4 {
                     let mut decoder = self.decoder.lock().await;
 
@@ -397,7 +406,7 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
             },
             Http2FrameType::Continuation => {
                 let mut decoder = self.decoder.lock().await;
-                // strict verify wether headers has opened
+                // TODO: strict verify wether headers has opened
                 if let Some(mut shard) = self.streams.get_mut(&frame.stream_id) {
                     if let Some(promising) = shard.promising && let Some(mut promised) = self.streams.get_mut(&promising) {
                         promised.promise.extend_from_slice(frame.get_payload());

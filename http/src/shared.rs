@@ -393,3 +393,14 @@ impl std::error::Error for LibError {
 }
 pub type LibResult<T> = Result<T, LibError>;
 
+
+pub(crate) fn string_from_owned_utf8(vec: Vec<u8>) -> String {
+    match String::from_utf8(vec) {
+        Ok(s) => s,
+        Err(e) => {
+            let vec = e.into_bytes();
+            let cow = String::from_utf8_lossy(&vec);
+            cow.into_owned()
+        }
+    }
+}

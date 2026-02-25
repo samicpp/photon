@@ -1,6 +1,6 @@
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 
-use crate::{http2::session::Http2Session, shared::{HttpClient, HttpSocket, HttpType, LibError, LibResult, ReadStream, WriteStream}};
+use crate::{http2::session::Http2Session, shared::{HttpClient, HttpSocket, HttpType, LibError, LibResult, ReadStream, WriteStream, string_from_owned_utf8}};
 
 
 #[derive(Debug)]
@@ -42,50 +42,53 @@ impl<R: ReadStream, W: WriteStream> Http2Socket<R, W> {
             self.is_reset = true;
         }
         else if !self.client.head_complete {
-            if shard.end_head {
-                self.client.head_complete = true;
-    
-                let mut headers = Vec::with_capacity(shard.headers.len());
-                headers.append(&mut shard.headers);
-                drop(shard);
-    
-                for (h, v) in headers {
-                    let header = String::from_utf8(h).map_err(|_| LibError::InvalidString)?;
-                    let value = String::from_utf8(v).map_err(|_| LibError::InvalidString)?;
-
-                    if header == ":method" {
-                        self.client.method = value.into();
-                    }
-                    else if header == ":scheme" {
-                        self.client.scheme = Some(value);
-                    }
-                    else if header == ":authority" {
-                        self.client.host = Some(value)
-                    }
-                    else if header == ":path" {
-                        self.client.path = value
-                    }
-
-                    else if let Some(values) = self.client.headers.get_mut(&header) {
-                        values.push(value)
-                    }
-                    else {
-                        self.client.headers.insert(header, vec![value]);
-                    }
-                }
-            }
-            else {
+            let mut shard = 
+            if !shard.end_head {
                 let notif = shard.head_complete.clone();
                 drop(shard);
                 notif.notified().await;
+                self.session.streams.get_mut(&self.stream_id).unwrap()
+            }
+            else { shard };
+            
+            self.client.head_complete = true;
+
+            let mut headers = Vec::with_capacity(shard.headers.len());
+            headers.append(&mut shard.headers);
+            drop(shard);
+
+            for (h, v) in headers {
+                let header = string_from_owned_utf8(h);
+                let value = string_from_owned_utf8(v);
+
+                if header == ":method" {
+                    self.client.method = value.into();
+                }
+                else if header == ":scheme" {
+                    self.client.scheme = Some(value);
+                }
+                else if header == ":authority" {
+                    self.client.host = Some(value)
+                }
+                else if header == ":path" {
+                    self.client.path = value
+                }
+
+                else if let Some(values) = self.client.headers.get_mut(&header) {
+                    values.push(value)
+                }
+                else {
+                    self.client.headers.insert(header, vec![value]);
+                }
             }
         }
         else if !self.client.body_complete {
-            if shard.end_body {
-                self.client.body.append(&mut shard.body);
-                self.client.body_complete = true;
-            }
-            else {
+
+            let avail = shard.body.len();
+            self.client.body.append(&mut shard.body);
+            self.client.body_complete = shard.end_body;
+            
+            if avail == 0 {
                 let notif = shard.body_received.clone();
                 drop(shard);
                 notif.notified().await;

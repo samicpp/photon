@@ -256,7 +256,7 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "http"
-version = "2.2.3"
+version = "2.2.4"
 dependencies = [
  "base64",
  "dashmap",
@@ -267,7 +267,7 @@ dependencies = [
 
 [[package]]
 name = "httplib"
-version = "3.1.2"
+version = "3.1.3"
 dependencies = [
  "dashmap",
  "http",

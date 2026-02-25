@@ -14,6 +14,7 @@ pub mod ffi;
 pub mod httpcpp;
 pub mod errno;
 pub mod clients;
+// pub mod auto_server;
 
 
 pub static PROVIDER: LazyLock<Arc<CryptoProvider>> = LazyLock::new(|| Arc::new(rustls::crypto::aws_lc_rs::default_provider()));

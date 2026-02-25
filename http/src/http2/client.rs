@@ -1,6 +1,6 @@
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 
-use crate::{http2::session::Http2Session, shared::{HttpMethod, HttpRequest, HttpResponse, HttpType, LibError, LibResult, ReadStream, WriteStream}};
+use crate::{http2::session::Http2Session, shared::{HttpMethod, HttpRequest, HttpResponse, HttpType, LibError, LibResult, ReadStream, WriteStream, string_from_owned_utf8}};
 
 
 #[derive(Debug)]
@@ -101,41 +101,44 @@ impl<R: ReadStream, W: WriteStream> Http2Request<R, W> {
             self.is_reset = true;
         }
         else if !self.response.head_complete {
-            if shard.end_head {
-                self.response.head_complete = true;
-    
-                let mut headers = Vec::with_capacity(shard.headers.len());
-                headers.append(&mut shard.headers);
-                drop(shard);
-    
-                for (h, v) in headers {
-                    let header = String::from_utf8(h).map_err(|_| LibError::InvalidString)?;
-                    let value = String::from_utf8(v).map_err(|_| LibError::InvalidString)?;
-
-                    if header == ":status" {
-                        self.response.code = value.parse().unwrap_or(0);
-                    }
-
-                    else if let Some(values) = self.response.headers.get_mut(&header) {
-                        values.push(value)
-                    }
-                    else {
-                        self.response.headers.insert(header, vec![value]);
-                    }
-                }
-            }
-            else {
+            let mut shard = 
+            if !shard.end_head {
                 let notif = shard.head_complete.clone();
                 drop(shard);
                 notif.notified().await;
+                self.session.streams.get_mut(&self.stream_id).unwrap()
+            }
+            else { shard };
+            
+            self.response.head_complete = true;
+
+            let mut headers = Vec::with_capacity(shard.headers.len());
+            headers.append(&mut shard.headers);
+            drop(shard);
+
+            for (h, v) in headers {
+                let header = string_from_owned_utf8(h);
+                let value = string_from_owned_utf8(v);
+
+                if header == ":status" {
+                    self.response.code = value.parse().unwrap_or(0);
+                }
+
+                else if let Some(values) = self.response.headers.get_mut(&header) {
+                    values.push(value)
+                }
+                else {
+                    self.response.headers.insert(header, vec![value]);
+                }
             }
         }
         else if !self.response.body_complete {
-            if shard.end_body {
-                self.response.body.append(&mut shard.body);
-                self.response.body_complete = true;
-            }
-            else {
+
+            let avail = shard.body.len();
+            self.response.body.append(&mut shard.body);
+            self.response.body_complete = shard.end_body;
+            
+            if avail == 0 {
                 let notif = shard.body_received.clone();
                 drop(shard);
                 notif.notified().await;

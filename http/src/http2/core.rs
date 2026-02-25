@@ -244,7 +244,7 @@ pub struct Http2Settings {
     pub max_header_list_size: Option<u32>,    // 6
 }
 impl Http2Settings {
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self {
             header_table_size: None,
             enable_push: None,
@@ -254,7 +254,7 @@ impl Http2Settings {
             max_header_list_size: None,
         }
     }
-    fn default() -> Self {
+    pub const fn default() -> Self {
         Self {
             header_table_size: Some(4096),
             enable_push: Some(1),
@@ -264,7 +264,7 @@ impl Http2Settings {
             max_header_list_size: None,
         }
     }
-    pub fn default_no_push() -> Self {
+    pub const fn default_no_push() -> Self {
         Self {
             header_table_size: Some(4096),
             enable_push: None,
@@ -274,7 +274,7 @@ impl Http2Settings {
             max_header_list_size: None,
         }
     }
-    pub fn maximum() -> Self {
+    pub const fn maximum() -> Self {
         Self {
             // unsigned, to be safe
             header_table_size: Some(2147483647),
