@@ -1,8 +1,8 @@
 use core::ffi::c_void;
-use std::ptr;
+use std::{os::fd::{FromRawFd, RawFd}, ptr};
 
-use httprs_core::ffi::{futures::FfiFuture, own::FfiSlice};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use httprs_core::ffi::{futures::FfiFuture, own::{AsFfiSlice, FfiSlice}};
+use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 
 use crate::{DynStream, errno::TYPE_ERR, spawn_task_with};
 
@@ -36,6 +36,20 @@ pub extern "C" fn create_duplex(bufsize: usize) -> FfiDuoStream {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn tcp_from_fd(fd: RawFd) -> *mut DynStream {
+    unsafe {
+        let tcp = std::net::TcpStream::from_raw_fd(fd);
+        
+        if let Ok(tcp) = TcpStream::from_std(tcp) {
+            heap_ptr(tcp.into())
+        } 
+        else { 
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn tcp_peek(fut: *mut FfiFuture, ffi: *mut DynStream, buf: *mut FfiSlice){
     unsafe {
         let ffi = &*ffi;
@@ -49,6 +63,23 @@ pub extern "C" fn tcp_peek(fut: *mut FfiFuture, ffi: *mut DynStream, buf: *mut F
         }
         else{
             fut.cancel_with_err(TYPE_ERR, "socket not tcp".into())
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn tls_get_alpn(stream: *mut DynStream) -> FfiSlice {
+    unsafe {
+        match &*stream {
+            DynStream::TcpTls(tls) => {
+                let (_, info) = tls.get_ref();
+                info.alpn_protocol().map(|alpn| alpn.to_vec().as_ffi_slice()).unwrap_or(FfiSlice::empty())
+            }
+            DynStream::TlsDuplex(tls) => {
+                let (_, info) = tls.get_ref();
+                info.alpn_protocol().map(|alpn| alpn.to_vec().as_ffi_slice()).unwrap_or(FfiSlice::empty())
+            }
+            _ => FfiSlice::empty(),
         }
     }
 }

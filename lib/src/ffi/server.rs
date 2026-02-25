@@ -1,4 +1,4 @@
-use std::{ffi::CStr, net::SocketAddr, ptr};
+use std::{ffi::CStr, net::SocketAddr, os::fd::{FromRawFd, RawFd}, ptr};
 
 use http::{http1::server::Http1Socket, shared::{HttpClient, HttpMethod, HttpSocket, HttpType, HttpVersion}};
 use httprs_core::ffi::{futures::FfiFuture, own::{FfiSlice, spawn_task}};
@@ -135,6 +135,25 @@ pub extern "C" fn tcp_server_new(fut: *mut FfiFuture, string: *mut i8){
             let lis = TcpListener::bind(addr).await?;
             Ok(heap_void_ptr(lis))
         });
+    }
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn tcp_server_from_fd(fd: RawFd) -> *mut TcpListener {
+    unsafe {
+        let tcp = std::net::TcpListener::from_raw_fd(fd);
+        
+        if let Ok(tcp) = TcpListener::from_std(tcp) {
+            heap_ptr(tcp)
+        } 
+        else { 
+            ptr::null_mut()
+        }
+    }
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn tcp_server_free(listener: *mut TcpListener) {
+    unsafe {
+        drop(Box::from_raw(listener))
     }
 }
 

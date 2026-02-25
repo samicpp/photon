@@ -170,7 +170,7 @@ impl FfiSlice{
         }
     }
 
-    pub fn empty() -> Self{
+    pub const fn empty() -> Self{
         Self { len: 0, cap: 0, ptr: ptr::null(), owned: false }
     }
 
