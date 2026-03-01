@@ -4,3 +4,9 @@ exclude = [ "quinn" ]
 resolver = "3"
 # edition = "2024"
 # authors = ["samicpp"]
+
+[profile.release]
+panic = "abort"
+
+[profile.dev]
+panic = "unwind"

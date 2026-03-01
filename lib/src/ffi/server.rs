@@ -1,7 +1,7 @@
 use std::{ffi::CStr, net::SocketAddr, os::fd::{FromRawFd, RawFd}, ptr};
 
 use http::{http1::server::Http1Socket, shared::{HttpClient, HttpMethod, HttpSocket, HttpType, HttpVersion}};
-use httprs_core::ffi::{futures::FfiFuture, own::{FfiSlice, spawn_task}};
+use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice, own::spawn_task};
 use tokio::{io::AsyncWriteExt, net::TcpListener};
 
 use crate::{DynStream, errno::{Errno, TYPE_ERR}, ffi::utils::{heap_ptr, heap_void_ptr}, servers::{DynHttpSocket, detect_prot}, spawn_task_with};
@@ -301,8 +301,8 @@ pub extern "C" fn http_read_until_head_complete(fut: *mut FfiFuture, http: *mut 
 #[unsafe(no_mangle)]
 pub extern "C" fn http_set_header(http: *mut DynHttpSocket, pair: FfiHeaderPair){
     unsafe{
-        let name = pair.nam.as_str();
-        let value = pair.val.as_str();
+        let name = pair.nam.as_str_lossy();
+        let value = pair.val.as_str_lossy();
 
         (*http).set_header(&name, &value);
     }
@@ -310,8 +310,8 @@ pub extern "C" fn http_set_header(http: *mut DynHttpSocket, pair: FfiHeaderPair)
 #[unsafe(no_mangle)]
 pub extern "C" fn http_add_header(http: *mut DynHttpSocket, pair: FfiHeaderPair){
     unsafe{
-        let name = pair.nam.as_str();
-        let value = pair.val.as_str();
+        let name = pair.nam.as_str_lossy();
+        let value = pair.val.as_str_lossy();
 
         (*http).add_header(&name, &value);
     }
@@ -319,7 +319,7 @@ pub extern "C" fn http_add_header(http: *mut DynHttpSocket, pair: FfiHeaderPair)
 #[unsafe(no_mangle)]
 pub extern "C" fn http_del_header(http: *mut DynHttpSocket, name: FfiSlice){
     unsafe{
-        let name = name.as_str();
+        let name = name.as_str_lossy();
         let _ = (*http).del_header(&name);
     }
 }
@@ -401,25 +401,25 @@ pub extern "C" fn http_client_get_version(http: *mut DynHttpSocket) -> u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn http_client_has_header(http: *mut DynHttpSocket, name: FfiSlice) -> bool {
     unsafe{
-        (*http).get_client().headers.contains_key(name.as_str().as_ref())
+        (*http).get_client().headers.contains_key(name.as_str_lossy().as_ref())
     }
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn http_client_has_header_count(http: *mut DynHttpSocket, name: FfiSlice) -> usize {
     unsafe{
-        (*http).get_client().headers.get(name.as_str().as_ref()).and_then(|h|Some(h.len())).unwrap_or(0)
+        (*http).get_client().headers.get(name.as_str_lossy().as_ref()).and_then(|h|Some(h.len())).unwrap_or(0)
     }
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn http_client_get_first_header(http: *mut DynHttpSocket, name: FfiSlice) -> FfiSlice {
     unsafe{
-        (*http).get_client().headers.get(name.as_str().as_ref()).and_then(|h|Some(FfiSlice::from_string(h[0].clone()))).unwrap_or(FfiSlice::empty())
+        (*http).get_client().headers.get(name.as_str_lossy().as_ref()).and_then(|h|Some(FfiSlice::from_string(h[0].clone()))).unwrap_or(FfiSlice::empty())
     }
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn http_client_get_header(http: *mut DynHttpSocket, name: FfiSlice, index: usize) -> FfiSlice {
     unsafe{
-        (*http).get_client().headers.get(name.as_str().as_ref()).and_then(
+        (*http).get_client().headers.get(name.as_str_lossy().as_ref()).and_then(
             |h|h.get(index)
             .and_then(|h|Some(FfiSlice::from_string(h.clone())))
         ).unwrap_or(FfiSlice::empty())

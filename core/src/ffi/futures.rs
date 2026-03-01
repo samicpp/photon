@@ -1,11 +1,12 @@
 use std::{cell::UnsafeCell, ffi::c_void, future::poll_fn, ptr, sync::{atomic::{AtomicU8, Ordering}}, task::{Poll, Waker}};
 
-use crate::ffi::own::FfiSlice;
+use crate::ffi::slice::FfiSlice;
 
 pub const PENDING: u8 = 0;
 pub const READY: u8 = 1;
 pub const CANCELED: u8 = 2;
 
+#[derive(Debug)]
 pub struct FfiFuture{
     pub state: AtomicU8,
     pub result: UnsafeCell<*mut c_void>,

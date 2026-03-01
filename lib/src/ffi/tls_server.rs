@@ -1,6 +1,6 @@
 use std::{ffi::CStr, ptr, sync::Arc};
 
-use httprs_core::ffi::{futures::FfiFuture, own::FfiSlice};
+use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice};
 use rustls::{ServerConfig, pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject}, sign::CertifiedKey};
 use tokio_rustls::TlsAcceptor;
 

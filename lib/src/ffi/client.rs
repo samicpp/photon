@@ -1,7 +1,7 @@
 use std::{ffi::CStr, ptr};
 
 use http::{http1::client::Http1Request, shared::{HttpMethod, HttpRequest, HttpResponse, HttpType}};
-use httprs_core::ffi::{futures::FfiFuture, own::FfiSlice};
+use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice};
 
 use crate::{DynStream, clients::{DynHttpRequest, tcp_connect as ntcpconn, tls_upgrade, tls_upgrade_no_verification}, errno::TYPE_ERR, ffi::{const_enums::methods, server::FfiHeaderPair, utils::{heap_ptr, heap_void_ptr}}, spawn_task_with};
 
@@ -154,8 +154,8 @@ pub extern "C" fn http_req_get_type(http: *mut DynHttpRequest) -> u8{
 #[unsafe(no_mangle)]
 pub extern "C" fn http_req_set_header(req: *mut DynHttpRequest, pair: FfiHeaderPair){
     unsafe{
-        let name = pair.nam.as_str();
-        let value = pair.val.as_str();
+        let name = pair.nam.as_str_lossy();
+        let value = pair.val.as_str_lossy();
 
         (*req).set_header(&name, &value);
     }
@@ -163,8 +163,8 @@ pub extern "C" fn http_req_set_header(req: *mut DynHttpRequest, pair: FfiHeaderP
 #[unsafe(no_mangle)]
 pub extern "C" fn http_req_add_header(req: *mut DynHttpRequest, pair: FfiHeaderPair){
     unsafe{
-        let name = pair.nam.as_str();
-        let value = pair.val.as_str();
+        let name = pair.nam.as_str_lossy();
+        let value = pair.val.as_str_lossy();
 
         (*req).add_header(&name, &value);
     }
@@ -172,7 +172,7 @@ pub extern "C" fn http_req_add_header(req: *mut DynHttpRequest, pair: FfiHeaderP
 #[unsafe(no_mangle)]
 pub extern "C" fn http_req_del_header(req: *mut DynHttpRequest, name: FfiSlice){
     unsafe{
-        let name = name.as_str();
+        let name = name.as_str_lossy();
         let _ = (*req).del_header(&name);
     }
 }
@@ -180,7 +180,7 @@ pub extern "C" fn http_req_del_header(req: *mut DynHttpRequest, name: FfiSlice){
 #[unsafe(no_mangle)]
 pub extern "C" fn http_req_set_method_str(req: *mut DynHttpRequest, method: FfiSlice){
     unsafe{
-        let meth = method.as_str().as_ref().into();
+        let meth = method.as_str_lossy().as_ref().into();
         (*req).set_method(meth);
     }
 }
@@ -204,7 +204,7 @@ pub extern "C" fn http_req_set_method_byte(req: *mut DynHttpRequest, method: u8)
 #[unsafe(no_mangle)]
 pub extern "C" fn http_req_set_path(req: *mut DynHttpRequest, path: FfiSlice){
     unsafe{
-        let path = path.as_str().to_string();
+        let path = path.as_str_lossy().to_string();
         (*req).set_path(path);
     }
 }
@@ -296,25 +296,25 @@ pub extern "C" fn http_response_get_status_msg(req: *mut DynHttpRequest) -> FfiS
 #[unsafe(no_mangle)]
 pub extern "C" fn http_response_has_header(req: *mut DynHttpRequest, name: FfiSlice) -> bool {
     unsafe{
-        (*req).get_response().headers.contains_key(name.as_str().as_ref())
+        (*req).get_response().headers.contains_key(name.as_str_lossy().as_ref())
     }
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn http_response_has_header_count(req: *mut DynHttpRequest, name: FfiSlice) -> usize {
     unsafe{
-        (*req).get_response().headers.get(name.as_str().as_ref()).and_then(|h|Some(h.len())).unwrap_or(0)
+        (*req).get_response().headers.get(name.as_str_lossy().as_ref()).and_then(|h|Some(h.len())).unwrap_or(0)
     }
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn http_response_get_first_header(req: *mut DynHttpRequest, name: FfiSlice) -> FfiSlice {
     unsafe{
-        (*req).get_response().headers.get(name.as_str().as_ref()).and_then(|h|Some(FfiSlice::from_string(h[0].clone()))).unwrap_or(FfiSlice::empty())
+        (*req).get_response().headers.get(name.as_str_lossy().as_ref()).and_then(|h|Some(FfiSlice::from_string(h[0].clone()))).unwrap_or(FfiSlice::empty())
     }
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn http_response_get_header(req: *mut DynHttpRequest, name: FfiSlice, index: usize) -> FfiSlice {
     unsafe{
-        (*req).get_response().headers.get(name.as_str().as_ref()).and_then(
+        (*req).get_response().headers.get(name.as_str_lossy().as_ref()).and_then(
             |h|h.get(index)
             .and_then(|h|Some(FfiSlice::from_string(h.clone())))
         ).unwrap_or(FfiSlice::empty())

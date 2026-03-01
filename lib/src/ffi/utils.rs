@@ -1,7 +1,7 @@
 use core::ffi::c_void;
 use std::{os::fd::{FromRawFd, RawFd}, ptr};
 
-use httprs_core::ffi::{futures::FfiFuture, own::{AsFfiSlice, FfiSlice}};
+use httprs_core::ffi::{futures::FfiFuture, slice::{AsFfiSlice, FfiSlice}};
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 
 use crate::{DynStream, errno::TYPE_ERR, spawn_task_with};
