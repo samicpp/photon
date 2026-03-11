@@ -203,6 +203,7 @@ impl Default for HttpClient{
 }
 
 
+// TODO: make seperate dynsafe trait implemented for all that impl this
 pub trait HttpSocket{
     fn get_type(&self) -> HttpType;
 
@@ -264,6 +265,7 @@ impl HttpResponse{
     }
 }
 
+// TODO: make seperate dynsafe trait implemented for all that impl this
 pub trait HttpRequest{
     fn get_type(&self) -> HttpType;
 

@@ -303,6 +303,7 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
             Http2FrameType::RstStream => {
                 if let Some(mut shard) = self.streams.get_mut(&frame.stream_id) {
                     shard.reset = true;
+                    shard.notify.notify_waiters();
 
                     Ok(None)
                 }
@@ -378,6 +379,7 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
                 self.goaway.store(true, Ordering::SeqCst);
                 let mut goaway = self.goaway_frame.lock().unwrap();
                 *goaway = Some(frame);
+                self.notify.notify_waiters();
                 Ok(None)
             },
             Http2FrameType::WindowUpdate => {
