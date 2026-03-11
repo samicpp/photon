@@ -1,9 +1,33 @@
 [workspace]
-members = [ "core", "quic", "http", "lib" ]
+members = [ "core", "quic", "http", "ffi" ]
 exclude = [ "quinn" ]
 resolver = "3"
-# edition = "2024"
-# authors = ["samicpp"]
+
+[package]
+name = "httplib"
+version = "1.0.0"
+edition = "2024"
+authors = [ "samicpp" ]
+
+description = "Lowlevel Async FFI HTTP Framework"
+repository = "https://github.com/samicpp/httplib"
+
+readme = "README.md"
+categories = ["network", "protocol", "http", "ffi"]
+keywords = [ 
+    "http", "http/0.9", "http/1.0", "http/1.1", "http2", "websocket", 
+    "ffi", "async", 
+]
+
+[lib]
+name = "httplib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+httprs_core = { path = "./core" }
+quic = { path = "./quic" }
+http = { path = "./http" }
+ffi = { path = "./ffi" }
 
 [profile.release]
 panic = "abort"
