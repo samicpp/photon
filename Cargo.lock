@@ -3,6 +3,21 @@
 version = 4
 
 [[package]]
+name = "asyncffi"
+version = "3.2.0"
+dependencies = [
+ "dashmap",
+ "http",
+ "httprs_core",
+ "quinn",
+ "rand",
+ "rustls",
+ "tokio",
+ "tokio-rustls",
+ "webpki-roots",
+]
+
+[[package]]
 name = "aws-lc-rs"
 version = "1.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -200,21 +215,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ffi"
-version = "3.2.0"
-dependencies = [
- "dashmap",
- "http",
- "httprs_core",
- "quinn",
- "rand",
- "rustls",
- "tokio",
- "tokio-rustls",
- "webpki-roots",
-]
-
-[[package]]
 name = "find-msvc-tools"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -284,7 +284,7 @@ dependencies = [
 name = "httplib"
 version = "1.0.0"
 dependencies = [
- "ffi",
+ "asyncffi",
  "http",
  "httprs_core",
  "quic",

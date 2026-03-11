@@ -1,7 +1,8 @@
 [workspace]
-members = [ "core", "quic", "http", "ffi" ]
+members = [ "core", "quic", "http", "asyncffi" ]
 exclude = [ "quinn" ]
 resolver = "3"
+
 
 [package]
 name = "httplib"
@@ -19,18 +20,25 @@ keywords = [
     "ffi", "async", 
 ]
 
+
 [lib]
 name = "httplib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+
 [dependencies]
-httprs_core = { path = "./core" }
 quic = { path = "./quic" }
 http = { path = "./http" }
-ffi = { path = "./ffi" }
+asyncffi = { path = "./asyncffi", optional = true }
+httprs_core = { path = "./core", optional = true }
+
+
+[features]
+default = ["asyncffi"]
+asyncffi = ["dep:httprs_core", "dep:asyncffi"]
+
 
 [profile.release]
 panic = "abort"
-
 [profile.dev]
 panic = "unwind"

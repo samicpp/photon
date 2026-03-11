@@ -1,5 +1,5 @@
 [package]
-name = "ffi"
+name = "asyncffi"
 version = "3.2.0"
 edition = "2024"
 
@@ -8,9 +8,9 @@ edition = "2024"
 # crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-quinn = { version = "=0.11.9", features = ["aws-lc-rs"] }
 httprs_core = { path = "../core" }
 http = { path = "../http" }
+quinn = { version = "=0.11.9", features = ["aws-lc-rs"] }
 tokio = "=1.50.0"
 rustls = { version = "=0.23.37", default-features = false, features = ["aws-lc-rs"] } # TODO: allow selecting ring or aws
 tokio-rustls = "=0.26.4"
