@@ -36,6 +36,7 @@ httprs_core = { path = "./core", optional = true }
 [features]
 default = ["asyncffi"]
 asyncffi = ["dep:httprs_core", "dep:asyncffi"]
+unix-sockets = ["asyncffi/unix-sockets"]
 
 
 [profile.release]

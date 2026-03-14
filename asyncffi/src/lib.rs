@@ -3,6 +3,8 @@ use std::{ffi::c_void, pin::Pin, sync::{Arc, LazyLock}};
 use http::shared::{LibError, Stream};
 use httprs_core::ffi::{futures::FfiFuture, own::spawn_task};
 use rustls::crypto::CryptoProvider;
+#[cfg(feature = "unix-sockets")]
+use tokio::net::UnixStream;
 use tokio::{io::{AsyncRead, AsyncWrite, DuplexStream}, net::TcpStream};
 use tokio_rustls::TlsStream;
 
@@ -21,10 +23,14 @@ pub static PROVIDER: LazyLock<Arc<CryptoProvider>> = LazyLock::new(|| Arc::new(r
 
 #[derive(Debug)]
 pub enum DynStream {
-    Tcp(TcpStream),
-    TcpTls(TlsStream<TcpStream>),
     Duplex(DuplexStream),
     TlsDuplex(TlsStream<DuplexStream>),
+    Tcp(TcpStream),
+    TcpTls(TlsStream<TcpStream>),
+    #[cfg(feature = "unix-sockets")]
+    Unix(UnixStream),
+    #[cfg(feature = "unix-sockets")]
+    UnixTls(TlsStream<UnixStream>),
 }
 impl DynStream{
     pub fn to_stream(self) -> Box<dyn Stream>{
@@ -33,9 +39,21 @@ impl DynStream{
             Self::TcpTls(tls) => Box::new(tls),
             Self::Duplex(dup) => Box::new(dup),
             Self::TlsDuplex(dup) => Box::new(dup),
+            #[cfg(feature = "unix-sockets")]
+            Self::Unix(uni) => Box::new(uni),
+            #[cfg(feature = "unix-sockets")]
+            Self::UnixTls(uni) => Box::new(uni),
         }
     }
 
+    pub fn is_duplex(&self) -> bool {
+        if let Self::Duplex(_) = self { true }
+        else { false }
+    }
+    pub fn is_tls_duplex(&self) -> bool {
+        if let Self::TlsDuplex(_) = self { true }
+        else { false }
+    }
     pub fn is_tcp(&self) -> bool {
         if let Self::Tcp(_) = self { true }
         else { false }
@@ -44,12 +62,14 @@ impl DynStream{
         if let Self::TcpTls(_) = self { true }
         else { false }
     }
-    pub fn is_duplex(&self) -> bool {
-        if let Self::Duplex(_) = self { true }
+    #[cfg(feature = "unix-sockets")]
+    pub fn is_unix(&self) -> bool {
+        if let Self::Unix(_) = self { true }
         else { false }
     }
-    pub fn is_tls_duplex(&self) -> bool {
-        if let Self::TlsDuplex(_) = self { true }
+    #[cfg(feature = "unix-sockets")]
+    pub fn is_unix_tls(&self) -> bool {
+        if let Self::UnixTls(_) = self { true }
         else { false }
     }
 }
@@ -105,6 +125,10 @@ impl AsyncRead for DynStream {
                 Self::TcpTls(tls) => Pin::new_unchecked(tls).poll_read(cx, buf),
                 Self::Duplex(dup) => Pin::new_unchecked(dup).poll_read(cx, buf),
                 Self::TlsDuplex(dup) => Pin::new_unchecked(dup).poll_read(cx, buf),
+                #[cfg(feature = "unix-sockets")]
+                Self::Unix(uni) => Pin::new_unchecked(uni).poll_read(cx, buf),
+                #[cfg(feature = "unix-sockets")]
+                Self::UnixTls(uni) => Pin::new_unchecked(uni).poll_read(cx, buf),
             }
         }
     }
@@ -117,6 +141,10 @@ impl AsyncWrite for DynStream {
                 Self::TcpTls(tls) => Pin::new_unchecked(tls).poll_flush(cx),
                 Self::Duplex(dup) => Pin::new_unchecked(dup).poll_flush(cx),
                 Self::TlsDuplex(dup) => Pin::new_unchecked(dup).poll_flush(cx),
+                #[cfg(feature = "unix-sockets")]
+                Self::Unix(uni) => Pin::new_unchecked(uni).poll_flush(cx),
+                #[cfg(feature = "unix-sockets")]
+                Self::UnixTls(uni) => Pin::new_unchecked(uni).poll_flush(cx),
             }
         }
     }
@@ -127,6 +155,10 @@ impl AsyncWrite for DynStream {
                 Self::TcpTls(tls) => Pin::new_unchecked(tls).poll_shutdown(cx),
                 Self::Duplex(dup) => Pin::new_unchecked(dup).poll_shutdown(cx),
                 Self::TlsDuplex(dup) => Pin::new_unchecked(dup).poll_shutdown(cx),
+                #[cfg(feature = "unix-sockets")]
+                Self::Unix(uni) => Pin::new_unchecked(uni).poll_shutdown(cx),
+                #[cfg(feature = "unix-sockets")]
+                Self::UnixTls(uni) => Pin::new_unchecked(uni).poll_shutdown(cx),
             }
         }
     }
@@ -141,6 +173,10 @@ impl AsyncWrite for DynStream {
                 Self::TcpTls(tls) => Pin::new_unchecked(tls).poll_write(cx, buf),
                 Self::Duplex(dup) => Pin::new_unchecked(dup).poll_write(cx, buf),
                 Self::TlsDuplex(dup) => Pin::new_unchecked(dup).poll_write(cx, buf),
+                #[cfg(feature = "unix-sockets")]
+                Self::Unix(uni) => Pin::new_unchecked(uni).poll_write(cx, buf),
+                #[cfg(feature = "unix-sockets")]
+                Self::UnixTls(uni) => Pin::new_unchecked(uni).poll_write(cx, buf),
             }
         }
     }
@@ -155,6 +191,10 @@ impl AsyncWrite for DynStream {
                 Self::TcpTls(tls) => Pin::new_unchecked(tls).poll_write_vectored(cx, bufs),
                 Self::Duplex(dup) => Pin::new_unchecked(dup).poll_write_vectored(cx, bufs),
                 Self::TlsDuplex(dup) => Pin::new_unchecked(dup).poll_write_vectored(cx, bufs),
+                #[cfg(feature = "unix-sockets")]
+                Self::Unix(uni) => Pin::new_unchecked(uni).poll_write_vectored(cx, bufs),
+                #[cfg(feature = "unix-sockets")]
+                Self::UnixTls(uni) => Pin::new_unchecked(uni).poll_write_vectored(cx, bufs),
             }
         }
     }
@@ -164,6 +204,10 @@ impl AsyncWrite for DynStream {
             Self::TcpTls(tls) => tls.is_write_vectored(),
             Self::Duplex(dup) => dup.is_write_vectored(),
             Self::TlsDuplex(dup) => dup.is_write_vectored(),
+            #[cfg(feature = "unix-sockets")]
+            Self::Unix(uni) => uni.is_write_vectored(),
+            #[cfg(feature = "unix-sockets")]
+            Self::UnixTls(uni) => uni.is_write_vectored(),
         }
     }
 }

@@ -85,6 +85,22 @@ pub extern "C" fn tls_get_alpn(stream: *mut DynStream) -> FfiSlice {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn stream_get_type(stream: *mut DynStream) -> u8 {
+    unsafe {
+        match &*stream {
+            DynStream::Duplex(_) => 0,
+            DynStream::TlsDuplex(_) => 1,
+            DynStream::Tcp(_) => 2,
+            DynStream::TcpTls(_) => 3,
+            #[cfg(feature = "unix-sockets")]
+            DynStream::Unix(_) => 4,
+            #[cfg(feature = "unix-sockets")]
+            DynStream::UnixTls(_) => 5,
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn stream_read(fut: *mut FfiFuture, stream: *mut DynStream, buf: *mut FfiSlice){
     unsafe {
         let stream = &mut *stream;
@@ -93,6 +109,19 @@ pub extern "C" fn stream_read(fut: *mut FfiFuture, stream: *mut DynStream, buf: 
 
         spawn_task_with(fut, async move {
             Ok(heap_void_ptr(stream.read(buf).await))
+        });
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn stream_read_exact(fut: *mut FfiFuture, stream: *mut DynStream, buf: *mut FfiSlice){
+    unsafe {
+        let stream = &mut *stream;
+        let fut = &*fut;
+        let buf = (*buf).as_bytes_mut();
+
+        spawn_task_with(fut, async move {
+            Ok(heap_void_ptr(stream.read_exact(buf).await))
         });
     }
 }
