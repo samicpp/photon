@@ -6,7 +6,7 @@ resolver = "3"
 
 [package]
 name = "httplib"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 authors = [ "samicpp" ]
 
@@ -22,7 +22,7 @@ keywords = [
 
 
 [lib]
-name = "httplib"
+name = "http"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 

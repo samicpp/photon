@@ -3,9 +3,9 @@ name = "asyncffi"
 version = "3.2.0"
 edition = "2024"
 
-# [lib]
-# name = "httplib"
-# crate-type = ["staticlib", "cdylib", "rlib"]
+[lib]
+name = "ffihttp"
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
 httprs_core = { path = "../core" }
