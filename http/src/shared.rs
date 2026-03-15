@@ -203,8 +203,24 @@ impl Default for HttpClient{
 }
 
 
-// TODO: make seperate dynsafe trait implemented for all that impl this
 pub trait HttpSocket{
+    fn get_type(&self) -> HttpType;
+
+    fn get_client<'_a>(&'_a self) -> &'_a HttpClient;
+    fn read_client<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a;
+    fn read_until_complete<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a;
+    fn read_until_head_complete<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a;
+
+    fn add_header(&mut self, header: &str, value: &str);
+    fn set_header(&mut self, header: &str, value: &str);
+    fn del_header(&mut self, header: &str) -> Option<Vec<String>>;
+    
+    fn set_status(&mut self, code: u16, message: String);
+    fn write<'a>(&'a mut self, body: &'a [u8]) -> impl Future<Output = Result<(), LibError>> + Send + 'a;
+    fn close<'a>(&'a mut self, body: &'a [u8]) -> impl Future<Output = Result<(), LibError>> + Send + 'a;
+    fn flush<'a>(&'a mut self) -> impl Future<Output = Result<(), LibError>> + Send + 'a;
+}
+pub trait HttpSocketDyn{
     fn get_type(&self) -> HttpType;
 
     fn get_client<'_a>(&'_a self) -> &'_a HttpClient;
@@ -220,6 +236,47 @@ pub trait HttpSocket{
     fn write<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>>;
     fn close<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>>;
     fn flush<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>>;
+}
+impl<H: HttpSocket> HttpSocketDyn for H {
+    fn get_type(&self) -> HttpType {
+        HttpSocket::get_type(self)
+    }
+
+    fn get_client<'_a>(&'_a self) -> &'_a HttpClient {
+        HttpSocket::get_client(self)
+    }
+    fn read_client<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a>> {
+        Box::pin(HttpSocket::read_client(self))
+    }
+    fn read_until_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a>> {
+        Box::pin(HttpSocket::read_until_complete(self))
+    }
+    fn read_until_head_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a>> {
+        Box::pin(HttpSocket::read_until_head_complete(self))
+    }
+
+    fn add_header(&mut self, header: &str, value: &str) {
+        HttpSocket::add_header(self, header, value)
+    }
+    fn set_header(&mut self, header: &str, value: &str) {
+        HttpSocket::set_header(self, header, value)
+    }
+    fn del_header(&mut self, header: &str) -> Option<Vec<String>> {
+        HttpSocket::del_header(self, header)
+    }
+
+    fn set_status(&mut self, code: u16, message: String) {
+        HttpSocket::set_status(self, code, message)
+    }
+    fn write<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
+        Box::pin(HttpSocket::write(self, body))
+    }
+    fn close<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
+        Box::pin(HttpSocket::close(self, body))
+    }
+    fn flush<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
+        Box::pin(HttpSocket::flush(self))
+    }
 }
 
 // pub type DynHttpSocket = Box<dyn HttpSocket>;
@@ -265,8 +322,28 @@ impl HttpResponse{
     }
 }
 
-// TODO: make seperate dynsafe trait implemented for all that impl this
 pub trait HttpRequest{
+    fn get_type(&self) -> HttpType;
+
+    fn add_header(&mut self, header: &str, value: &str);
+    fn set_header(&mut self, header: &str, value: &str);
+    fn del_header(&mut self, header: &str) -> Option<Vec<String>>;
+    
+    fn set_method(&mut self, method: HttpMethod);
+    fn set_scheme(&mut self, scheme: String);
+    fn set_path(&mut self, path: String);
+    fn set_host(&mut self, host: String);
+
+    fn write<'a>(&'a mut self, body: &'a [u8]) -> impl Future<Output = Result<(), LibError>> + Send + 'a;
+    fn send<'a>(&'a mut self, body: &'a [u8]) -> impl Future<Output = Result<(), LibError>> + Send + 'a;
+    fn flush<'a>(&'a mut self) -> impl Future<Output = Result<(), LibError>> + Send + 'a;
+
+    fn get_response<'_a>(&'_a self) -> &'_a HttpResponse;
+    fn read_response<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a;
+    fn read_until_complete<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a;
+    fn read_until_head_complete<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a;
+}
+pub trait HttpRequestDyn{
     fn get_type(&self) -> HttpType;
 
     fn add_header(&mut self, header: &str, value: &str);
@@ -286,6 +363,57 @@ pub trait HttpRequest{
     fn read_response<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>>;
     fn read_until_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>>;
     fn read_until_head_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>>;
+}
+impl<H: HttpRequest> HttpRequestDyn for H {
+    fn get_type(&self) -> HttpType {
+        HttpRequest::get_type(self)
+    }
+
+    fn add_header(&mut self, header: &str, value: &str) {
+        HttpRequest::add_header(self, header, value)
+    }
+    fn set_header(&mut self, header: &str, value: &str) {
+        HttpRequest::set_header(self, header, value)
+    }
+    fn del_header(&mut self, header: &str) -> Option<Vec<String>> {
+        HttpRequest::del_header(self, header)
+    }
+
+    fn set_method(&mut self, method: HttpMethod) {
+        HttpRequest::set_method(self, method)
+    }
+    fn set_scheme(&mut self, scheme: String) {
+        HttpRequest::set_scheme(self, scheme)
+    }
+    fn set_path(&mut self, path: String) {
+        HttpRequest::set_path(self, path)
+    }
+    fn set_host(&mut self, host: String) {
+        HttpRequest::set_host(self, host)
+    }
+
+    fn write<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
+        Box::pin(HttpRequest::write(self, body))
+    }
+    fn send<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
+        Box::pin(HttpRequest::send(self, body))
+    }
+    fn flush<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
+        Box::pin(HttpRequest::flush(self))
+    }
+
+    fn get_response<'_a>(&'_a self) -> &'_a HttpResponse {
+        HttpRequest::get_response(self)
+    }
+    fn read_response<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>> {
+        Box::pin(HttpRequest::read_response(self))
+    }
+    fn read_until_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>> {
+        Box::pin(HttpRequest::read_until_complete(self))
+    }
+    fn read_until_head_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>> {
+        Box::pin(HttpRequest::read_until_head_complete(self))
+    }
 }
 
 

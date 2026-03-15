@@ -1,5 +1,3 @@
-use std::pin::Pin;
-
 use tokio::io::BufReader;
 
 use crate::{http1::{client::Http1Request, server::Http1Socket}, http2::{client::Http2Request, server::Http2Socket}, shared::{HttpClient, HttpMethod, HttpRequest, HttpResponse, HttpSocket, HttpType, LibError, ReadStream, WriteStream}};
@@ -23,29 +21,23 @@ impl<R: ReadStream, W: WriteStream> HttpSocket for PolyHttpSocket<R, W>{
             Self::Http2(h) => &h.client,
         }
     }
-    fn read_client(&'_ mut self) -> Pin<Box<dyn Future<Output = Result<&'_ HttpClient, LibError>> + Send + '_>> {
-        Box::pin(async move {
-            match self{
-                Self::Http1(h) => h.read_client().await,
-                Self::Http2(h) => h.read_client().await,
-            }
-        })
+    async fn read_client(&'_ mut self) -> Result<&'_ HttpClient, LibError> {
+        match self{
+            Self::Http1(h) => h.read_client().await,
+            Self::Http2(h) => h.read_client().await,
+        }
     }
-    fn read_until_complete(&'_ mut self) -> Pin<Box<dyn Future<Output = Result<&'_ HttpClient, LibError>> + Send + '_>> {
-        Box::pin(async move {
-            match self{
-                Self::Http1(h) => h.read_until_complete().await,
-                Self::Http2(h) => h.read_until_complete().await,
-            }
-        })
+    async fn read_until_complete(&'_ mut self) -> Result<&'_ HttpClient, LibError> {
+        match self{
+            Self::Http1(h) => h.read_until_complete().await,
+            Self::Http2(h) => h.read_until_complete().await,
+        }
     }
-    fn read_until_head_complete(&'_ mut self) -> Pin<Box<dyn Future<Output = Result<&'_ HttpClient, LibError>> + Send + '_>> {
-        Box::pin(async move {
-            match self{
-                Self::Http1(h) => h.read_until_head_complete().await,
-                Self::Http2(h) => h.read_until_head_complete().await,
-            }
-        })
+    async fn read_until_head_complete(&'_ mut self) -> Result<&'_ HttpClient, LibError> {
+        match self{
+            Self::Http1(h) => h.read_until_head_complete().await,
+            Self::Http2(h) => h.read_until_head_complete().await,
+        }
     }
 
     fn add_header(&mut self, header: &str, value: &str) { 
@@ -76,29 +68,23 @@ impl<R: ReadStream, W: WriteStream> HttpSocket for PolyHttpSocket<R, W>{
             Self::Http2(h) => h.status = code,
         }
     }
-    fn write<'a>(&'a mut self, body: &'a [u8] ) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move {
-            match self{
-                Self::Http1(h) => h.write(body).await,
-                Self::Http2(h) => h.write(body).await,
-            }
-        })
+    async fn write<'a>(&'a mut self, body: &'a [u8]) -> Result<(), LibError> {
+        match self{
+            Self::Http1(h) => h.write(body).await,
+            Self::Http2(h) => h.write(body).await,
+        }
     }
-    fn close<'a>(&'a mut self, body: &'a [u8] ) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move {
-            match self{
-                Self::Http1(h) => h.close(body).await,
-                Self::Http2(h) => h.close(body).await,
-            }
-        })
+    async fn close<'a>(&'a mut self, body: &'a [u8]) -> Result<(), LibError> {
+        match self{
+            Self::Http1(h) => h.close(body).await,
+            Self::Http2(h) => h.close(body).await,
+        }
     }
-    fn flush<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move{
-            match self{
-                Self::Http1(h) => h.flush().await,
-                Self::Http2(h) => h.flush().await,
-            }
-        })
+    async fn flush<'a>(&'a mut self) -> Result<(), LibError> {
+        match self{
+            Self::Http1(h) => h.flush().await,
+            Self::Http2(h) => h.flush().await,
+        }
     }
 }
 
@@ -166,29 +152,23 @@ impl<R: ReadStream, W: WriteStream> HttpRequest for PolyHttpRequest<R, W>{
         }
     }
 
-    fn write<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move{
-            match self {
-                Self::Http1(h) => h.write(body).await,
-                Self::Http2(h) => h.write(body).await,
-            }
-        })
+    async fn write<'a>(&'a mut self, body: &'a [u8]) -> Result<(), LibError> {
+        match self {
+            Self::Http1(h) => h.write(body).await,
+            Self::Http2(h) => h.write(body).await,
+        }
     }
-    fn send<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move{
-            match self {
-                Self::Http1(h) => h.send(body).await,
-                Self::Http2(h) => h.send(body).await,
-            }
-        })
+    async fn send<'a>(&'a mut self, body: &'a [u8]) -> Result<(), LibError> {
+        match self {
+            Self::Http1(h) => h.send(body).await,
+            Self::Http2(h) => h.send(body).await,
+        }
     }
-    fn flush<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move{
-            match self {
-                Self::Http1(h) => h.flush().await,
-                Self::Http2(h) => h.flush().await,
-            }
-        })
+    async fn flush<'a>(&'a mut self) -> Result<(), LibError> {
+        match self {
+            Self::Http1(h) => h.flush().await,
+            Self::Http2(h) => h.flush().await,
+        }
     }
 
     fn get_response<'_a>(&'_a self) -> &'_a HttpResponse {
@@ -197,29 +177,23 @@ impl<R: ReadStream, W: WriteStream> HttpRequest for PolyHttpRequest<R, W>{
             Self::Http2(h) => h.get_response(),
         }
     }
-    fn read_response<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>> {
-        Box::pin(async move{
-            match self {
-                Self::Http1(h) => h.read_response().await,
-                Self::Http2(h) => h.read_response().await,
-            }
-        })
+    async fn read_response<'_a>(&'_a mut self) -> Result<&'_a HttpResponse, LibError> {
+        match self {
+            Self::Http1(h) => h.read_response().await,
+            Self::Http2(h) => h.read_response().await,
+        }
     }
-    fn read_until_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>> {
-        Box::pin(async move{
-            match self {
-                Self::Http1(h) => h.read_until_complete().await,
-                Self::Http2(h) => h.read_until_complete().await,
-            }
-        })
+    async fn read_until_complete<'_a>(&'_a mut self) -> Result<&'_a HttpResponse, LibError> {
+        match self {
+            Self::Http1(h) => h.read_until_complete().await,
+            Self::Http2(h) => h.read_until_complete().await,
+        }
     }
-    fn read_until_head_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>> {
-        Box::pin(async move{
-            match self {
-                Self::Http1(h) => h.read_until_head_complete().await,
-                Self::Http2(h) => h.read_until_head_complete().await,
-            }
-        })
+    async fn read_until_head_complete<'_a>(&'_a mut self) -> Result<&'_a HttpResponse, LibError> {
+        match self {
+            Self::Http1(h) => h.read_until_head_complete().await,
+            Self::Http2(h) => h.read_until_head_complete().await,
+        }
     }
 }
 

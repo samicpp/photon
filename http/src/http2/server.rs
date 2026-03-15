@@ -1,4 +1,4 @@
-use std::{collections::HashMap, pin::Pin, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{http2::session::Http2Session, shared::{HttpClient, HttpSocket, HttpType, LibError, LibResult, ReadStream, WriteStream, string_from_owned_utf8}};
 
@@ -156,50 +156,47 @@ impl<R: ReadStream, W: WriteStream> Http2Socket<R, W> {
         self.session.send_data(self.stream_id, true, buf).await
     }
 }
-impl<R: ReadStream, W:WriteStream> HttpSocket for Http2Socket<R, W> {
+impl<R: ReadStream, W: WriteStream> HttpSocket for Http2Socket<R, W>{
+    #[inline]
     fn get_type(&self) -> HttpType {
         HttpType::Http2
     }
 
-    fn get_client<'_a>(&'_a self) -> &'_a HttpClient {
+    #[inline]
+    fn get_client(&self) -> &HttpClient {
         &self.client
     }
-    fn read_client<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a>> {
-        Box::pin(async move {
-            self.read_client().await
-        })
+    #[inline]
+    fn read_client(&'_ mut self) -> impl Future<Output = Result<&'_ HttpClient, LibError>> + Send + '_ {
+        self.read_client()
     }
-    fn read_until_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a>> {
-        Box::pin(async move {
-            self.read_until_complete().await
-        })
+    #[inline]
+    fn read_until_complete(&'_ mut self) -> impl Future<Output = Result<&'_ HttpClient, LibError>> + Send + '_ {
+        self.read_until_complete()
     }
-    fn read_until_head_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a>> {
-        Box::pin(async move {
-            self.read_until_head_complete().await
-        })
+    #[inline]
+    fn read_until_head_complete(&'_ mut self) -> impl Future<Output = Result<&'_ HttpClient, LibError>> + Send + '_ {
+        self.read_until_head_complete()
     }
 
-    fn add_header(&mut self, header: &str, value: &str) { self.add_header(&header.to_lowercase(), value) }
-    fn set_header(&mut self, header: &str, value: &str) { self.set_header(&header.to_lowercase(), value) }
-    fn del_header(&mut self, header: &str) -> Option<Vec<String>> { self.del_header(&header.to_lowercase()) }
-    
-    fn set_status(&mut self, code: u16, _: String) {
+    #[inline] fn add_header(&mut self, header: &str, value: &str) { self.add_header(&header.to_lowercase(), value) }
+    #[inline] fn set_header(&mut self, header: &str, value: &str){ self.set_header(&header.to_lowercase(), value) }
+    #[inline] fn del_header(&mut self, header: &str) -> Option<Vec<String>>{ self.del_header(&header.to_lowercase()) }
+
+    #[inline]
+    fn set_status(&mut self, code: u16, _message: String) {
         self.status = code;
     }
-    fn write<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move {
-            self.write(body).await
-        })
+    #[inline]
+    fn write<'a>(&'a mut self, body: &'a [u8] ) -> impl Future<Output = Result<(), LibError>> + Send + 'a {
+        self.write(body)
     }
-    fn close<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move {
-            self.close(body).await
-        })
+    #[inline]
+    fn close<'a>(&'a mut self, body: &'a [u8] ) -> impl Future<Output = Result<(), LibError>> + Send + 'a {
+        self.close(body)
     }
-    fn flush<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move {
-            Ok(())
-        })
+    #[inline]
+    fn flush<'a>(&'a mut self) -> impl Future<Output = Result<(), LibError>> + Send + 'a {
+        std::future::ready(Ok(()))
     }
 }

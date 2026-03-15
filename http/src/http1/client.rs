@@ -1,4 +1,4 @@
-use std::{collections::HashMap, pin::Pin};
+use std::collections::HashMap;
 
 use rand::Rng;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
@@ -338,61 +338,61 @@ impl<R: ReadStream, W: WriteStream> Http1Request<R, W>{
     }
 }
 impl<R: ReadStream, W: WriteStream> HttpRequest for Http1Request<R, W>{
+    #[inline]
     fn get_type(&self) -> HttpType {
         HttpType::Http1
     }
 
+    #[inline]
     fn get_response(&self) -> &HttpResponse {
         &self.response
     }
-    fn read_response(&'_ mut self) -> Pin<Box<dyn Future<Output = Result<&'_ HttpResponse, LibError>> + Send + '_>> {
-        Box::pin(async move {
-            self.read_response().await
-        })
+    #[inline]
+    fn read_response(&'_ mut self) -> impl Future<Output = Result<&'_ HttpResponse, LibError>> + Send + '_ {
+        self.read_response()
     }
-    fn read_until_complete(&'_ mut self) -> Pin<Box<dyn Future<Output = Result<&'_ HttpResponse, LibError>> + Send + '_>> {
-        Box::pin(async move {
-            self.read_until_complete().await
-        })
+    #[inline]
+    fn read_until_complete(&'_ mut self) -> impl Future<Output = Result<&'_ HttpResponse, LibError>> + Send + '_ {
+        self.read_until_complete()
     }
-    fn read_until_head_complete(&'_ mut self) -> Pin<Box<dyn Future<Output = Result<&'_ HttpResponse, LibError>> + Send + '_>> {
-        Box::pin(async move {
-            self.read_until_head_complete().await
-        })
+    #[inline]
+    fn read_until_head_complete(&'_ mut self) -> impl Future<Output = Result<&'_ HttpResponse, LibError>> + Send + '_ {
+        self.read_until_head_complete()
     }
 
 
-    fn add_header(&mut self, header: &str, value: &str) { self.add_header(header, value) }
-    fn set_header(&mut self, header: &str, value: &str){ self.set_header(header, value) }
-    fn del_header(&mut self, header: &str) -> Option<Vec<String>>{ self.del_header(header) }
+    #[inline] fn add_header(&mut self, header: &str, value: &str) { self.add_header(header, value) }
+    #[inline] fn set_header(&mut self, header: &str, value: &str){ self.set_header(header, value) }
+    #[inline] fn del_header(&mut self, header: &str) -> Option<Vec<String>>{ self.del_header(header) }
 
+    #[inline]
     fn set_method(&mut self, method: HttpMethod) {
         self.method = method;
     }
+    #[inline]
     fn set_scheme(&mut self, _: String) {
         ()
     }
+    #[inline]
     fn set_path(&mut self, path: String) {
         self.path = path;
     }
+    #[inline]
     fn set_host(&mut self, host: String) {
         self.set_header(&"Host", &host);
     }
 
-    fn write<'a>(&'a mut self, body: &'a [u8] ) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move {
-            self.write(body).await
-        })
+    #[inline]
+    fn write<'a>(&'a mut self, body: &'a [u8] ) -> impl Future<Output = Result<(), LibError>> + Send + 'a {
+        self.write(body)
     }
-    fn send<'a>(&'a mut self, body: &'a [u8] ) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move {
-            self.send(body).await
-        })
+    #[inline]
+    fn send<'a>(&'a mut self, body: &'a [u8] ) -> impl Future<Output = Result<(), LibError>> + Send + 'a {
+        self.send(body)
     }
-    fn flush<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move{
-            self.flush().await
-        })
+    #[inline]
+    fn flush<'a>(&'a mut self) -> impl Future<Output = Result<(), LibError>> + Send + 'a {
+        self.flush()
     }
 }
 

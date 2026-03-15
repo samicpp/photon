@@ -1,4 +1,4 @@
-use std::{collections::HashMap, pin::Pin, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{http2::session::Http2Session, shared::{HttpMethod, HttpRequest, HttpResponse, HttpType, LibError, LibResult, ReadStream, WriteStream, string_from_owned_utf8}};
 
@@ -161,51 +161,47 @@ impl<R: ReadStream, W: WriteStream> Http2Request<R, W> {
     }
 }
 impl<R: ReadStream, W: WriteStream> HttpRequest for Http2Request<R, W> {
+    #[inline]
     fn get_type(&self) -> HttpType {
         HttpType::Http2
     }
 
-    fn add_header(&mut self, header: &str, value: &str) { self.add_header(&header.to_lowercase(), value) }
-    fn set_header(&mut self, header: &str, value: &str) { self.set_header(&header.to_lowercase(), value) }
-    fn del_header(&mut self, header: &str) -> Option<Vec<String>> { self.del_header(&header.to_lowercase()) }
+    #[inline] fn add_header(&mut self, header: &str, value: &str) { self.add_header(&header.to_lowercase(), value) }
+    #[inline] fn set_header(&mut self, header: &str, value: &str) { self.set_header(&header.to_lowercase(), value) }
+    #[inline] fn del_header(&mut self, header: &str) -> Option<Vec<String>> { self.del_header(&header.to_lowercase()) }
     
-    fn set_method(&mut self, method: HttpMethod) { self.method = method }
-    fn set_scheme(&mut self, scheme: String) { self.scheme = scheme }
-    fn set_path(&mut self, path: String) { self.path = path }
-    fn set_host(&mut self, host: String) { self.authority = host }
+    #[inline] fn set_method(&mut self, method: HttpMethod) { self.method = method }
+    #[inline] fn set_scheme(&mut self, scheme: String) { self.scheme = scheme }
+    #[inline] fn set_path(&mut self, path: String) { self.path = path }
+    #[inline] fn set_host(&mut self, host: String) { self.authority = host }
 
-    fn write<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move {
-            self.write(body).await
-        })
+    #[inline]
+    fn write<'a>(&'a mut self, body: &'a [u8]) -> impl Future<Output = Result<(), LibError>> + Send + 'a {
+        self.write(body)
     }
-    fn send<'a>(&'a mut self, body: &'a [u8]) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move {
-            self.send(body).await
-        })
+    #[inline]
+    fn send<'a>(&'a mut self, body: &'a [u8]) -> impl Future<Output = Result<(), LibError>> + Send + 'a {
+        self.send(body)
     }
-    fn flush<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = Result<(), LibError>> + Send + 'a>> {
-        Box::pin(async move {
-            Ok(())
-        })
+    #[inline]
+    fn flush<'a>(&'a mut self) -> impl Future<Output = Result<(), LibError>> + Send + 'a {
+        std::future::ready(Ok(()))
     }
 
+    #[inline]
     fn get_response<'_a>(&'_a self) -> &'_a HttpResponse {
         &self.response
     }
-    fn read_response<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>> {
-        Box::pin(async move {
-            self.read_response().await
-        })
+    #[inline]
+    fn read_response<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a {
+        self.read_response()
     }
-    fn read_until_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>> {
-        Box::pin(async move {
-            self.read_until_complete().await
-        })
+    #[inline]
+    fn read_until_complete<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a {
+        self.read_until_complete()
     }
-    fn read_until_head_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a>> {
-        Box::pin(async move {
-            self.read_until_head_complete().await
-        })
+    #[inline]
+    fn read_until_head_complete<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpResponse, LibError>> + Send + '_a {
+        self.read_until_head_complete()
     }
 }
