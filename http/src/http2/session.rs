@@ -1,7 +1,7 @@
 use std::{cmp::min, io, sync::{Arc, Mutex as SyncMutex, atomic::{AtomicBool, Ordering}}};
 
 use dashmap::DashMap;
-use tokio::{io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf}, sync::{Mutex as AsyncMutex, Notify}};
+use tokio::{io::{AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf}, sync::{Mutex as AsyncMutex, Notify}};
 
 use crate::{http2::{core::{Http2Frame, Http2FrameType, Http2Settings}, hpack::{HeaderType, HpackError, decoder::Decoder, encoder::Encoder}}, shared::{LibError, LibResult, ReadStream, Stream, WriteStream}};
 
@@ -114,6 +114,20 @@ impl<S: Stream> Http2Session<ReadHalf<S>, WriteHalf<S>> {
     pub fn new_server(net: S) -> Self {
         let (netr, netw) = tokio::io::split(net);
         Self::with(netr, netw, Mode::Server, true, Http2Settings::default())
+    }
+}
+impl<S: Stream> Http2Session<BufReader<ReadHalf<S>>, WriteHalf<S>> {
+    pub fn new_buf(net: S, bufsize: usize) -> Self {
+        let (netr, netw) = tokio::io::split(net);
+        Self::with(BufReader::with_capacity(bufsize, netr), netw, Mode::Ambiguous, true, Http2Settings::default())
+    }
+    pub fn new_buf_client(net: S, bufsize: usize) -> Self {
+        let (netr, netw) = tokio::io::split(net);
+        Self::with(BufReader::with_capacity(bufsize, netr), netw, Mode::Client, true, Http2Settings::default())
+    }
+    pub fn new_buf_server(net: S, bufsize: usize) -> Self {
+        let (netr, netw) = tokio::io::split(net);
+        Self::with(BufReader::with_capacity(bufsize, netr), netw, Mode::Server, true, Http2Settings::default())
     }
 }
 impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
