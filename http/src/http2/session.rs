@@ -671,14 +671,17 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
         Ok(())
     }
 
+    #[inline]
     pub async fn send_priority(&self, stream_id: u32, dependency: u32, weight: u8) -> io::Result<()> {
         self.write_frame(Http2FrameType::Priority, 0, stream_id, None, Some(&[(dependency >> 24) as u8, (dependency >> 16) as u8, (dependency >> 8) as u8, dependency as u8, weight]), None).await
     }
     
+    #[inline]
     pub async fn send_rst_stream(&self, stream_id: u32, code: u32) -> io::Result<()> { 
         self.write_frame(Http2FrameType::RstStream, 0, stream_id, None, Some(&u32::to_be_bytes(code)), None).await
     }
 
+    #[inline]
     pub async fn send_settings(&self, settings: Http2Settings) -> io::Result<()> { 
         self.write_frame(Http2FrameType::Settings, 0, 0, None, Some(&settings.to_vec()), None).await
     }
@@ -753,6 +756,7 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
         Ok(())
     }
     
+    #[inline]
     pub async fn send_ping(&self, ack: bool, buf: &[u8]) -> io::Result<()> { 
         self.write_frame(Http2FrameType::Ping, if ack { 1 } else { 0 }, 0, None, Some(buf), None).await
     }
@@ -767,6 +771,7 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
         self.write_frame(Http2FrameType::Goaway, 0, 0, None, Some(&pay), None).await
     }
     
+    #[inline]
     pub async fn send_window_update(&self, stream_id: u32, size: u32) -> io::Result<()> {
         self.write_frame(Http2FrameType::WindowUpdate, 0, stream_id, None, Some(&u32::to_be_bytes(size)), None).await
     }

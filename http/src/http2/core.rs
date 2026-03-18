@@ -165,21 +165,24 @@ impl Http2Frame{
     }
 
 
+    #[inline]
     pub fn get_priority(&self) -> &[u8] {
         &self.source[self.priority.clone()]
     }
+    #[inline]
     pub fn get_payload(&self) -> &[u8] {
         &self.source[self.payload.clone()]
     }
+    #[inline]
     pub fn get_padding(&self) -> &[u8] {
         &self.source[self.padding.clone()]
     }
 
-    pub fn is_ack(&self) -> bool { self.flags & 0x01 != 0 }
-    pub fn is_end_stream(&self) -> bool { self.flags & 0x01 != 0 }
-    pub fn is_end_headers(&self) -> bool { self.flags & 0x04 != 0 }
-    pub fn is_padded(&self) -> bool { self.flags & 0x08 != 0 }
-    pub fn is_priority(&self) -> bool { self.flags & 0x20 != 0 }
+    #[inline] pub fn is_ack(&self) -> bool { self.flags & 0x01 != 0 }
+    #[inline] pub fn is_end_stream(&self) -> bool { self.flags & 0x01 != 0 }
+    #[inline] pub fn is_end_headers(&self) -> bool { self.flags & 0x04 != 0 }
+    #[inline] pub fn is_padded(&self) -> bool { self.flags & 0x08 != 0 }
+    #[inline] pub fn is_priority(&self) -> bool { self.flags & 0x20 != 0 }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -332,6 +335,7 @@ impl Http2Settings {
     }
 }
 impl Default for Http2Settings {
+    #[inline]
     fn default() -> Self {
         Self::default()
     }

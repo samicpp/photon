@@ -292,6 +292,7 @@ impl WebSocketFrame{
         payload
     }
 
+    #[inline]
     pub fn get_payload(&self) -> &[u8] {
         &self.source[self.payload.clone()]
     }
