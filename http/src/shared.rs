@@ -196,7 +196,7 @@ impl HttpClient{
         Self {
             valid: true,
 
-            mpv_complete: false,
+            mpv_complete: true,
             head_complete: false,
             body_complete: false,
 
@@ -215,7 +215,7 @@ impl HttpClient{
         Self {
             valid: true,
 
-            mpv_complete: false,
+            mpv_complete: true,
             head_complete: false,
             body_complete: false,
 
@@ -375,7 +375,7 @@ impl HttpResponse{
         Self {
             valid: true,
 
-            vcs_complete: false,
+            vcs_complete: true,
             head_complete: false,
             body_complete: false,
 
@@ -391,7 +391,7 @@ impl HttpResponse{
         Self {
             valid: true,
 
-            vcs_complete: false,
+            vcs_complete: true,
             head_complete: false,
             body_complete: false,
 
