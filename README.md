@@ -2,8 +2,15 @@
 my own ffi http library 
 
 ## Bindings
-I will make FFI bindings to a bunch of languages/frameworks for this library
+The bindings are in a seperate repo [samicpp/httplib-bindings](https://github.com/samicpp/httplib-bindings)
 
+## Crate features
+| feature      | requires | desciption                       |
+|--------------|----------|----------------------------------|
+| asyncffi     | -        | enables asynchronous ffi exports |
+| unix-sockets | asyncffi | allows unix sockets in ffi types |
+| ring         | asyncffi | uses ring provider               |
+| aws-lc-rs    | asyncffi | uses aws provider                |
 
 ## TODO
 
