@@ -19,7 +19,13 @@ pub mod clients;
 // pub mod auto_server;
 
 
+#[cfg(feature = "aws-lc-rs")]
 pub static PROVIDER: LazyLock<Arc<CryptoProvider>> = LazyLock::new(|| Arc::new(rustls::crypto::aws_lc_rs::default_provider()));
+#[cfg(feature = "ring")]
+pub static PROVIDER: LazyLock<Arc<CryptoProvider>> = LazyLock::new(|| Arc::new(rustls::crypto::ring::default_provider()));
+#[cfg(not(any(feature = "ring", feature = "aws-lc-rs")))]
+compile_error!("You must enable either feature \"ring\" or \"aws-lc-rs\"");
+
 
 #[derive(Debug)]
 pub enum DynStream {

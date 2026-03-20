@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-httprs_core = { path = "../core" }
-tokio = "=1.50.0"
-socket2 = "=0.6.2"
+# # httprs_core = { path = "../core" }
+# tokio = { version = "=1.50.0", features = ["full"] }
+# socket2 = "=0.6.3"
+# rustls = { version = "=0.23.37", default-features = false, features = [] }
+
+# [features]
+# ring = ["rustls/ring"]
+# aws-lc-rs = ["rustls/aws-lc-rs"]

@@ -37,7 +37,8 @@ httprs_core = { path = "./core", optional = true }
 default = ["asyncffi"]
 asyncffi = ["dep:httprs_core", "dep:asyncffi"]
 unix-sockets = ["asyncffi/unix-sockets"]
-
+ring = ["asyncffi/ring"]
+aws-lc-rs = ["asyncffi/aws-lc-rs"]
 
 [profile.release]
 panic = "abort"

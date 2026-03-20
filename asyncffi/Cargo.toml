@@ -1,6 +1,6 @@
 [package]
 name = "asyncffi"
-version = "3.3.1"
+version = "3.4.0"
 edition = "2024"
 
 [lib]
@@ -12,7 +12,7 @@ httprs_core = { path = "../core" }
 http = { path = "../http" }
 # quinn = { version = "=0.11.9", features = ["aws-lc-rs"] }
 tokio = "=1.50.0"
-rustls = { version = "=0.23.37", default-features = false, features = ["aws-lc-rs"] } # TODO: allow selecting ring or aws
+rustls = { version = "=0.23.37", default-features = false, features = [] }
 tokio-rustls = "=0.26.4"
 webpki-roots = "=1.0.6"
 rand = "=0.9.2"
@@ -21,4 +21,8 @@ dashmap = "=6.1.0"
 
 [features]
 default = []
+
 unix-sockets = []
+
+ring = ["rustls/ring"]
+aws-lc-rs = ["rustls/aws-lc-rs"]
