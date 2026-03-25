@@ -1,4 +1,4 @@
-# httplib
+# photon
 my own ffi http library 
 
 ## Bindings
