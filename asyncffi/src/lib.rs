@@ -24,7 +24,10 @@ pub static PROVIDER: LazyLock<Arc<CryptoProvider>> = LazyLock::new(|| Arc::new(r
 #[cfg(feature = "ring")]
 pub static PROVIDER: LazyLock<Arc<CryptoProvider>> = LazyLock::new(|| Arc::new(rustls::crypto::ring::default_provider()));
 #[cfg(not(any(feature = "ring", feature = "aws-lc-rs")))]
+pub static PROVIDER: LazyLock<Arc<CryptoProvider>> = LazyLock::new(|| rustls::crypto::CryptoProvider::get_default().unwrap().clone());
+#[cfg(not(any(feature = "ring", feature = "aws-lc-rs")))]
 compile_error!("You must enable either feature \"ring\" or \"aws-lc-rs\"");
+
 
 
 #[derive(Debug)]

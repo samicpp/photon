@@ -34,7 +34,7 @@ httprs_core = { path = "./core", optional = true }
 
 
 [features]
-default = ["asyncffi"]
+default = ["asyncffi", "aws-lc-rs"]
 asyncffi = ["dep:httprs_core", "dep:asyncffi"]
 unix-sockets = ["asyncffi/unix-sockets"]
 ring = ["asyncffi/ring"]

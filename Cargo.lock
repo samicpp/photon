@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "asyncffi"
-version = "3.3.1"
+version = "3.4.1"
 dependencies = [
  "dashmap",
  "http",
@@ -210,7 +210,7 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "http"
-version = "2.3.4"
+version = "2.3.9"
 dependencies = [
  "base64",
  "dashmap",
@@ -220,18 +220,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "httplib"
-version = "1.0.2"
-dependencies = [
- "asyncffi",
- "http",
- "httprs_core",
- "quic",
-]
-
-[[package]]
 name = "httprs_core"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "tokio",
 ]
@@ -308,6 +298,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "photon"
+version = "1.0.4"
+dependencies = [
+ "asyncffi",
+ "http",
+ "httprs_core",
+ "quic",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -334,11 +334,6 @@ dependencies = [
 [[package]]
 name = "quic"
 version = "0.1.0"
-dependencies = [
- "httprs_core",
- "socket2",
- "tokio",
-]
 
 [[package]]
 name = "quote"
@@ -416,6 +411,7 @@ dependencies = [
  "aws-lc-rs",
  "log",
  "once_cell",
+ "ring",
  "rustls-pki-types",
  "rustls-webpki",
  "subtle",
