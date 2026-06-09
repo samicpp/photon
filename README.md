@@ -45,6 +45,7 @@ The bindings are in a seperate repo [samicpp/httplib-bindings](https://github.co
 - [ ] add builtin content compressions (gzip, deflate, brotli, zstd)
 - [ ] change HttpSocket.set_status status type to `Cow<'static, str>`
 - [ ] change HttpSocket.set_header value type to `Cow<'static, str>`
+- [ ] add type in `FfiFuture<T>` in asyncffi ffi definitions
 
 ## Examples
 
