@@ -1,6 +1,6 @@
 [package]
 name = "http"
-version = "2.4.0"
+version = "2.4.1"
 edition = "2024"
 
 [dependencies]
@@ -11,3 +11,9 @@ base64 = "=0.22.1"
 sha1 = "=0.10.6"
 rand = "=0.9.2"
 dashmap = "=6.1.0"
+
+serde = { version = "1.0.228", optional = true}
+
+[features]
+default = []
+serde = ["dep:serde"]

@@ -46,6 +46,8 @@ The bindings are in a seperate repo [samicpp/httplib-bindings](https://github.co
 - [ ] change HttpSocket.set_status status type to `Cow<'static, str>`
 - [ ] change HttpSocket.set_header value type to `Cow<'static, str>`
 - [ ] add type in `FfiFuture<T>` in asyncffi ffi definitions
+- [ ] add header size limit for received connections to prevent attacks
+- [ ] implement `Serialize` and `Deserialize` for HttpClient and HttpResponse
 
 ## Examples
 

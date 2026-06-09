@@ -1,9 +1,10 @@
 use std::{fmt::Display, collections::HashMap, pin::Pin};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::http2::hpack::{HpackError, huffman::HuffmanError};
-
 
 
 pub trait ReadStream: AsyncRead + Unpin + Send + Sync {}
@@ -81,6 +82,31 @@ impl HttpVersion{
         }
     }
 }
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for HttpVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>
+    {
+        let s: &str = Deserialize::deserialize(deserializer)?;
+        
+        if "HTTP/0.9".eq_ignore_ascii_case(s) { Ok(Self::Http09) }
+        else if "HTTP/1.0".eq_ignore_ascii_case(s) { Ok(Self::Http10) }
+        else if "HTTP/1.1".eq_ignore_ascii_case(s) { Ok(Self::Http11) }
+        else if "HTTP/2".eq_ignore_ascii_case(s) { Ok(Self::Http2) }
+        else if "HTTP/3".eq_ignore_ascii_case(s) { Ok(Self::Http3) }
+        else { Ok(Self::Unknown(Some(s.to_owned()))) }
+    }
+}
+#[cfg(feature = "serde")]
+impl Serialize for HttpVersion {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HttpMethod{
@@ -141,7 +167,25 @@ impl<S: AsRef<str>> From<S> for HttpMethod{
         Self::from(value.as_ref())
     }
 }
-
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for HttpMethod {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>
+    {
+        let s: &str = Deserialize::deserialize(deserializer)?;
+        Ok(Self::from(s))
+    }
+}
+#[cfg(feature = "serde")]
+impl Serialize for HttpMethod {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
 
 
 /*pub trait HttpClient{
@@ -159,6 +203,7 @@ impl<S: AsRef<str>> From<S> for HttpMethod{
     fn clone(&self) -> Box<dyn HttpClient>;
 }*/
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Debug, Clone)]
 pub struct HttpClient{
     pub valid: bool,
@@ -320,7 +365,7 @@ impl<H: HttpSocket> HttpSocketDyn for H {
 // pub type DynHttpSocket = Box<dyn HttpSocket>;
 
 
-
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Debug, Clone)]
 pub struct HttpResponse{
     pub valid: bool,
