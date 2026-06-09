@@ -91,9 +91,9 @@ pub extern "C" fn ffi_future_free(fut: *mut FfiFuture) {
 #[unsafe(no_mangle)]
 pub extern "C" fn ffi_future_await(fut: *mut FfiFuture) {
     unsafe {
-        let rfut = (*fut).to_future();
+        let rfut = &mut *fut;
         RT.get().unwrap().block_on(async move {
-            rfut.await;
+            let _ = rfut.await;
         })
     }
 }
@@ -111,6 +111,19 @@ pub extern "C" fn ffi_future_get_errmsg(fut: *mut FfiFuture) -> *const FfiSlice 
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn ffi_future_reset(fut: *mut FfiFuture) {
+    unsafe {
+        (*fut) = FfiFuture::default()
+    }
+}
+
+// async_ffi(crate) FfiFuture
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rt_spawn_async_ffi_future(fut: async_ffi::FfiFuture<()>) {
+    RT.get().unwrap().spawn(fut);
+}
 
 // slice
 
