@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rand::Rng;
+use rand::RngExt;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
 
 use crate::{http1::get_chunk, http2::{PREFACE, core::Http2Settings, session::Http2Session}, shared::{HttpMethod, HttpRequest, HttpResponse, HttpType, HttpVersion, LibError, LibResult, ReadStream, Stream, WriteStream}, websocket::socket::{MAGIC, WebSocket}};

@@ -13,7 +13,7 @@ fn one_is_one(){
 
 #[test]
 fn ffi_future_sleep(){
-    let fut = FfiFuture::new(None, ptr::null_mut());
+    let fut: FfiFuture<()> = FfiFuture::new(None, ptr::null_mut());
 
     assert!(fut.state.load(Ordering::Acquire) == futures::PENDING);
     fut.complete(ptr::null_mut());

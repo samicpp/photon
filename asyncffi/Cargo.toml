@@ -1,6 +1,6 @@
 [package]
 name = "asyncffi"
-version = "3.4.2"
+version = "3.4.3"
 edition = "2024"
 
 [lib]
@@ -11,12 +11,12 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 httprs_core = { path = "../core" }
 http = { path = "../http" }
 # quinn = { version = "=0.11.9", features = ["aws-lc-rs"] }
-tokio = "=1.50.0"
-rustls = { version = "=0.23.37", default-features = false, features = [] }
+tokio = "=1.52.3"
+rustls = { version = "=0.23.40", default-features = false, features = [] }
 tokio-rustls = "=0.26.4"
-webpki-roots = "=1.0.6"
-rand = "=0.9.2"
-dashmap = "=6.1.0"
+webpki-roots = "=1.0.7"
+rand = "=0.10.1"
+dashmap = "=6.2.1"
 # rustls-pki-types = "=1.14.0"
 
 [features]

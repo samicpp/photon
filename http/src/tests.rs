@@ -228,7 +228,7 @@ fn http2_frame() {
         0x68, 0x69,
     ];
     
-    let frame = Http2Frame::from_owned(frame_raw.to_vec()).unwrap();
+    let frame = Http2Frame::from(std::borrow::Cow::Borrowed(&frame_raw)).unwrap();
     let frame_buff = Http2Frame::create(frame.ftype, frame.flags, frame.stream_id, Some(frame.get_priority()), Some(frame.get_payload()), Some(frame.get_padding()));
 
     assert_eq!(frame.is_end_headers(), false);
