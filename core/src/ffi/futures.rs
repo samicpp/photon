@@ -134,5 +134,5 @@ impl<T> Future for FfiFuture<T> {
     }
 }
 
-unsafe impl Sync for FfiFuture {}
-unsafe impl Send for FfiFuture {}
+unsafe impl<T> Sync for FfiFuture<T> {}
+unsafe impl<T> Send for FfiFuture<T> {}

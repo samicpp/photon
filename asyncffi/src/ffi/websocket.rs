@@ -1,11 +1,11 @@
-use std::ptr;
+use std::{ffi::c_void, ptr};
 
 use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice};
 use tokio::io::{BufReader, ReadHalf, WriteHalf};
 
 use http::{shared::Stream, websocket::{core::WebSocketFrame, socket::WebSocket}};
 
-use crate::{ffi::utils::heap_void_ptr, spawn_task_with};
+use crate::{ffi::utils::heap_ptr, spawn_task_with};
 
 
 pub type DynWebSocket = WebSocket<BufReader<ReadHalf<Box<dyn Stream>>>, WriteHalf<Box<dyn Stream>>>;
@@ -34,13 +34,13 @@ impl FfiWsFrame{
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_read_frame(fut: *mut FfiFuture, ws: *mut DynWebSocket){
+pub extern "C" fn websocket_read_frame(fut: *mut FfiFuture<FfiWsFrame>, ws: *mut DynWebSocket){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
 
         spawn_task_with(fut, async move{
-            Ok(heap_void_ptr(FfiWsFrame::from_owned(ws.read_frame().await?)))
+            Ok(heap_ptr(FfiWsFrame::from_owned(ws.read_frame().await?)))
         });
     }
 }
@@ -51,7 +51,7 @@ pub extern "C" fn websocket_free_frame(frame: *mut FfiWsFrame){
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_flush(fut: *mut FfiFuture, ws: *mut DynWebSocket){
+pub extern "C" fn websocket_flush(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -72,7 +72,7 @@ pub extern "C" fn websocket_free(ws: *mut DynWebSocket){
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_continuation(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_continuation(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -84,7 +84,7 @@ pub extern "C" fn websocket_send_continuation(fut: *mut FfiFuture, ws: *mut DynW
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_continuation_masked(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_continuation_masked(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -98,7 +98,7 @@ pub extern "C" fn websocket_send_continuation_masked(fut: *mut FfiFuture, ws: *m
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_continuation_frag(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_continuation_frag(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -110,7 +110,7 @@ pub extern "C" fn websocket_send_continuation_frag(fut: *mut FfiFuture, ws: *mut
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_continuation_masked_frag(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_continuation_masked_frag(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -125,7 +125,7 @@ pub extern "C" fn websocket_send_continuation_masked_frag(fut: *mut FfiFuture, w
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_text(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_text(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -137,7 +137,7 @@ pub extern "C" fn websocket_send_text(fut: *mut FfiFuture, ws: *mut DynWebSocket
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_text_masked(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_text_masked(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -151,7 +151,7 @@ pub extern "C" fn websocket_send_text_masked(fut: *mut FfiFuture, ws: *mut DynWe
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_text_frag(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_text_frag(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -163,7 +163,7 @@ pub extern "C" fn websocket_send_text_frag(fut: *mut FfiFuture, ws: *mut DynWebS
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_text_masked_frag(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_text_masked_frag(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -178,7 +178,7 @@ pub extern "C" fn websocket_send_text_masked_frag(fut: *mut FfiFuture, ws: *mut 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_binary(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_binary(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -190,7 +190,7 @@ pub extern "C" fn websocket_send_binary(fut: *mut FfiFuture, ws: *mut DynWebSock
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_binary_masked(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_binary_masked(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -204,7 +204,7 @@ pub extern "C" fn websocket_send_binary_masked(fut: *mut FfiFuture, ws: *mut Dyn
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_binary_frag(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_binary_frag(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -216,7 +216,7 @@ pub extern "C" fn websocket_send_binary_frag(fut: *mut FfiFuture, ws: *mut DynWe
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_binary_masked_frag(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_binary_masked_frag(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -231,7 +231,7 @@ pub extern "C" fn websocket_send_binary_masked_frag(fut: *mut FfiFuture, ws: *mu
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_close(fut: *mut FfiFuture, ws: *mut DynWebSocket, code: u16, buf: FfiSlice){
+pub extern "C" fn websocket_send_close(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, code: u16, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -243,7 +243,7 @@ pub extern "C" fn websocket_send_close(fut: *mut FfiFuture, ws: *mut DynWebSocke
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_close_masked(fut: *mut FfiFuture, ws: *mut DynWebSocket, code: u16, buf: FfiSlice){
+pub extern "C" fn websocket_send_close_masked(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, code: u16, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -258,7 +258,7 @@ pub extern "C" fn websocket_send_close_masked(fut: *mut FfiFuture, ws: *mut DynW
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_ping(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_ping(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -270,7 +270,7 @@ pub extern "C" fn websocket_send_ping(fut: *mut FfiFuture, ws: *mut DynWebSocket
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_ping_masked(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_ping_masked(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -284,7 +284,7 @@ pub extern "C" fn websocket_send_ping_masked(fut: *mut FfiFuture, ws: *mut DynWe
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_pong(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_pong(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;
@@ -296,7 +296,7 @@ pub extern "C" fn websocket_send_pong(fut: *mut FfiFuture, ws: *mut DynWebSocket
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn websocket_send_pong_masked(fut: *mut FfiFuture, ws: *mut DynWebSocket, buf: FfiSlice){
+pub extern "C" fn websocket_send_pong_masked(fut: *mut FfiFuture<c_void>, ws: *mut DynWebSocket, buf: FfiSlice){
     unsafe{
         let ws = &mut *ws;
         let fut = &*fut;

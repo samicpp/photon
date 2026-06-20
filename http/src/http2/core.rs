@@ -1,13 +1,13 @@
-use std::{borrow::Cow, ops::Range};
+use std::ops::Range;
 
 use tokio::io::AsyncReadExt;
 
-use crate::shared::ReadStream;
+use crate::shared::{ByteSource, LibError, ReadStream};
 
 
 #[derive(Debug, Clone)]
-pub struct Http2Frame<'a>{
-    pub source: Cow<'a, [u8]>,
+pub struct Http2Frame<'a, const L: usize = 0>{
+    pub source: ByteSource<'a, L>,
 
     pub length: u32,
     pub type_byte: u8,
@@ -21,10 +21,27 @@ pub struct Http2Frame<'a>{
 
     pub ftype: Http2FrameType,
 }
-impl<'a> Http2Frame<'a>{
-    pub fn to_owned(&self) -> Http2Frame<'static> {
+impl<'a, const L: usize> Http2Frame<'a, L>{
+    pub const fn default() -> Self {
+        Self {
+            source: ByteSource::Stack([0u8; L]),
+
+            length: 0,
+            type_byte: 0,
+            flags: 0,
+            stream_id: 0,
+            pad_len: 0,
+
+            priority: 0..0,
+            payload: 0..0,
+            padding: 0..0,
+
+            ftype: Http2FrameType::Invalid(0),
+        }
+    }
+    pub fn to_owned(&self) -> Http2Frame<'static, L> {
         Http2Frame {
-            source: Cow::Owned(match &self.source { Cow::Owned(v) => v.clone(), Cow::Borrowed(b) => b.to_vec() }),
+            source: self.source.to_owned(),
             length: self.length,
             type_byte: self.type_byte,
             flags: self.flags,
@@ -36,9 +53,9 @@ impl<'a> Http2Frame<'a>{
             ftype: self.ftype,
         }
     }
-    pub fn into_owned(self) -> Http2Frame<'static> {
+    pub fn into_owned(self) -> Http2Frame<'static, L> {
         Http2Frame {
-            source: Cow::Owned(match self.source { Cow::Owned(o) => o, Cow::Borrowed(b) => b.to_vec() }),
+            source: self.source.into_owned(),
             length: self.length,
             type_byte: self.type_byte,
             flags: self.flags,
@@ -50,15 +67,22 @@ impl<'a> Http2Frame<'a>{
             ftype: self.ftype,
         }
     }
-    pub fn is_owned(&self) -> bool {
+    pub const fn is_owned(&self) -> bool {
         match &self.source {
-            Cow::Owned(_) => true,
-            Cow::Borrowed(_) => false
+            ByteSource::Heap(_) => true,
+            ByteSource::Slice(_) => false,
+            ByteSource::Stack(_) => true,
         }
     }
 
-    pub fn from(source: Cow<'a, [u8]>) -> Option<Self> {
-        let buf = &*source;
+    pub fn from_owned(source: Vec<u8>) -> Option<Self> {
+        Self::from(ByteSource::Heap(source))
+    }
+    pub fn from_borrow(source: &'a [u8]) -> Option<Self> {
+        Self::from(ByteSource::Slice(source))
+    }
+    pub fn from(source: ByteSource<'a, L>) -> Option<Self> {
+        let buf = source.as_ref();
         if buf.len() < 9 { return None }
 
         let length = u32::from_be_bytes([0, buf[0], buf[1], buf[2]]);
@@ -99,7 +123,37 @@ impl<'a> Http2Frame<'a>{
             ftype,
         })
     }
-    pub async fn from_reader<R: ReadStream>(stream: &mut R) -> Result<Http2Frame<'static>, std::io::Error> {
+
+    #[inline]
+    pub const fn subslice_source(&self, start: usize, end: usize) -> &[u8] {
+        #[cfg(debug_assertions)] if start > end { panic!("start cannot be bigger than end") }
+
+        let slice = self.source.as_ref();
+        let (_, tail) = slice.split_at(start);
+        tail.split_at(end - start).0
+    }
+
+    #[inline]
+    pub const fn get_priority(&self) -> &[u8] {
+        &self.subslice_source(self.priority.start, self.priority.end)
+    }
+    #[inline]
+    pub const fn get_payload(&self) -> &[u8] {
+        &self.subslice_source(self.payload.start, self.payload.end)
+    }
+    #[inline]
+    pub const fn get_padding(&self) -> &[u8] {
+        &self.subslice_source(self.padding.start, self.padding.end)
+    }
+
+    #[inline] pub const fn is_ack(&self) -> bool { self.flags & 0x01 != 0 }
+    #[inline] pub const fn is_end_stream(&self) -> bool { self.flags & 0x01 != 0 }
+    #[inline] pub const fn is_end_headers(&self) -> bool { self.flags & 0x04 != 0 }
+    #[inline] pub const fn is_padded(&self) -> bool { self.flags & 0x08 != 0 }
+    #[inline] pub const fn is_priority(&self) -> bool { self.flags & 0x20 != 0 }
+}
+impl Http2Frame<'static, 0> {
+    pub async fn from_reader<R: ReadStream>(stream: &mut R) -> Result<Self, std::io::Error> {
         let mut source = vec![0; 9];
         stream.read_exact(&mut source).await?;
 
@@ -132,7 +186,7 @@ impl<'a> Http2Frame<'a>{
 
 
         Ok(Http2Frame {
-            source: Cow::Owned(source),
+            source: ByteSource::Heap(source),
             length,
             type_byte,
             flags,
@@ -147,40 +201,34 @@ impl<'a> Http2Frame<'a>{
         })
     }
 
-    pub fn create(ftype: impl Into<u8>, flags: u8, stream_id: u32, priority: Option<&[u8]>, payload: Option<&[u8]>, padding: Option<&[u8]>) -> Vec<u8> {
-        let mut priority = priority.filter(|s| s.len() == 5);
-        let mut payload = payload.filter(|s| s.len() < 16777216);
-        let mut padding = padding.filter(|s| s.len() < 256);
+    pub const fn write(frame: &mut [u8], ftype: u8, flags: u8, stream_id: u32, priority: Option<&[u8]>, payload: Option<&[u8]>, padding: Option<&[u8]>) -> Option<usize> {
+        match priority { Some(s) => if s.len() == 5 { Some(s) } else { return None }, None => None };
+        match payload { Some(s) => if s.len() < 16777216 { Some(s) } else { return None }, None => None };
+        match padding { Some(s) => if s.len() < 256 { Some(s) } else { return None }, None => None };
 
         let length = 
-            priority.and_then(|s| Some(s.len())).unwrap_or(0) + 
-            payload.and_then(|s| Some(s.len())).unwrap_or(0) + 
-            padding.and_then(|s| Some(s.len() + 1)).unwrap_or(0);
-
-        let length =         
+            match priority { Some(s) => s.len(), None => 0} + 
+            match payload { Some(s) => s.len(), None => 0} + 
+            match padding { Some(s) => s.len() + 1, None => 0};
+  
         if length > 16777216 {
-            priority = None;
-            payload = None;
-            padding = None;
-            0
+            return None;
         }
-        else {
-            length
-        };
         
-        let mut frame = vec![0; 9 + length];
+        // let mut frame = vec![0; 9 + length];
+        if frame.len() < 9 + length { return None }
 
         frame[0] = ((length & 0xff0000) >> 16) as u8;
         frame[1] = ((length & 0x00ff00) >> 8) as u8;
         frame[2] = length as u8;
 
-        frame[3] = ftype.into();
+        frame[3] = ftype;
         frame[4] = flags |
         if priority.is_some() { 0x20 } else { 0x00 } |
         if padding. is_some() { 0x08 } else { 0x00 } ;
-
-        frame[5..9].copy_from_slice(&u32::to_be_bytes(stream_id));
-
+        
+        { let (_, tail) = frame.split_at_mut(5); tail.split_at_mut(9 - 5).0 }.copy_from_slice(&u32::to_be_bytes(stream_id));
+        
         let mut start = 9;
 
         if let Some(pad) = padding {
@@ -188,39 +236,30 @@ impl<'a> Http2Frame<'a>{
             start += 1;
         }
         if let Some(priority) = priority {
-            frame[start..start + 5].copy_from_slice(priority);
+            { let (_, tail) = frame.split_at_mut(start); tail.split_at_mut(5).0 }.copy_from_slice(priority);
             start += 5;
         }
         if let Some(payload) = payload {
-            frame[start..start + payload.len()].copy_from_slice(payload);
+            { let (_, tail) = frame.split_at_mut(start); tail.split_at_mut(payload.len()).0 }.copy_from_slice(payload);
         }
         if let Some(padding) = padding {
-            let off = frame.len() - padding.len();
-            frame[off..].copy_from_slice(padding);
+            let off = length - padding.len();
+            frame.split_at_mut(off).1.copy_from_slice(padding);
         }
 
-        frame
+        Some(length)
     }
 
-
-    #[inline]
-    pub fn get_priority(&self) -> &[u8] {
-        &self.source[self.priority.clone()]
+    pub fn create_heap(ftype: impl Into<u8>, flags: u8, stream_id: u32, priority: Option<&[u8]>, payload: Option<&[u8]>, padding: Option<&[u8]>) -> Result<Vec<u8>, LibError> {
+        let length = match priority { Some(s) => s.len(), None => 0} + match payload { Some(s) => s.len(), None => 0} + match padding { Some(s) => s.len() + 1, None => 0};
+        let mut frame = vec![0; 9 + length];
+        if let None = Self::write(&mut frame, ftype.into(), flags, stream_id, priority, payload, padding) {
+            Err(LibError::InvalidFrame)
+        }
+        else {
+            Ok(frame)
+        }
     }
-    #[inline]
-    pub fn get_payload(&self) -> &[u8] {
-        &self.source[self.payload.clone()]
-    }
-    #[inline]
-    pub fn get_padding(&self) -> &[u8] {
-        &self.source[self.padding.clone()]
-    }
-
-    #[inline] pub fn is_ack(&self) -> bool { self.flags & 0x01 != 0 }
-    #[inline] pub fn is_end_stream(&self) -> bool { self.flags & 0x01 != 0 }
-    #[inline] pub fn is_end_headers(&self) -> bool { self.flags & 0x04 != 0 }
-    #[inline] pub fn is_padded(&self) -> bool { self.flags & 0x08 != 0 }
-    #[inline] pub fn is_priority(&self) -> bool { self.flags & 0x20 != 0 }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

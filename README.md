@@ -39,18 +39,16 @@ The FFI bindings are in a seperate repo [samicpp/httplib-bindings](https://githu
 - [x] FFI compatible
 - [x] custom error enums
 - [x] allow Http2Frame to live on stack
+- [x] change HttpSocket.set_status status type to ~~`Cow<'static, str>`~~ `String`
+- [x] change HttpSocket.set_header value type to ~~`Cow<'static, str>`~~ `String`
+- [x] add type in `FfiFuture<T>` in asyncffi ffi definitions
+- [x] implement `Serialize` and `Deserialize` for HttpClient and HttpResponse
 - [ ] allow configuring tokio runtime
 - [ ] ~~rewrite http to use `futures` instead of `tokio`~~
 - [ ] ~~allow compiling with different async runtimes~~
 - [ ] add builtin content compressions (gzip, deflate, brotli, zstd)
-- [ ] change HttpSocket.set_status status type to `Cow<'static, str>`
-- [ ] change HttpSocket.set_header value type to `Cow<'static, str>`
-- [ ] add type in `FfiFuture<T>` in asyncffi ffi definitions
-- [ ] add header size limit for received connections to prevent attacks
-- [ ] implement `Serialize` and `Deserialize` for HttpClient and HttpResponse
-- [ ] allow changing max client header size and time to prevent blowup attacks
+- [ ] add header size limit for reading connections to prevent attacks
 - [ ] allow setting protocol correctness enforcement
-
 ## Examples
 
 HTTP/1.1 server

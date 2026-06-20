@@ -4,7 +4,7 @@ use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice};
 use rustls::{ServerConfig, pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject}, sign::CertifiedKey};
 use tokio_rustls::TlsAcceptor;
 
-use crate::{DynStream, PROVIDER, ffi::utils::heap_void_ptr, servers::TlsCertSelector, spawn_task_with};
+use crate::{DynStream, PROVIDER, ffi::utils::heap_ptr, servers::TlsCertSelector, spawn_task_with};
 
 
 
@@ -95,7 +95,7 @@ pub extern "C" fn tls_config_free(conf: *const ServerConfig) {
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_upgrade_tls(fut: *mut FfiFuture, stream: *mut DynStream, conf: *const ServerConfig){
+pub extern "C" fn tcp_upgrade_tls(fut: *mut FfiFuture<DynStream>, stream: *mut DynStream, conf: *const ServerConfig){
     unsafe {
         let stream = *Box::from_raw(stream);
         let fut = &*fut;
@@ -110,15 +110,15 @@ pub extern "C" fn tcp_upgrade_tls(fut: *mut FfiFuture, stream: *mut DynStream, c
                 DynStream::Tcp(tcp) => {
                     let tls = acc.accept(tcp).await?;
                     let stream: DynStream = tls.into();
-                    Ok(heap_void_ptr(stream))
+                    Ok(heap_ptr(stream))
                 },
                 DynStream::Duplex(dup) => {
                     let tls = acc.accept(dup).await?;
                     let stream: DynStream = tls.into();
-                    Ok(heap_void_ptr(stream))
+                    Ok(heap_ptr(stream))
                 },
                 _ => {
-                    Ok(heap_void_ptr(stream))
+                    Ok(heap_ptr(stream))
                 },
             }
         })

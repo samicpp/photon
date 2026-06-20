@@ -1,5 +1,5 @@
 use core::ffi::c_void;
-use std::{os::fd::{FromRawFd, RawFd}, ptr};
+use std::{os::fd::{AsRawFd, FromRawFd, RawFd}, ptr};
 
 use httprs_core::ffi::{futures::FfiFuture, slice::{AsFfiSlice, FfiSlice}};
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
@@ -48,9 +48,46 @@ pub extern "C" fn tcp_from_fd(fd: RawFd) -> *mut DynStream {
         }
     }
 }
+#[cfg(feature = "unix-sockets")]
+#[unsafe(no_mangle)]
+pub extern "C" fn unix_from_fd(fd: RawFd) -> *mut DynStream {
+    unsafe {
+        use tokio::net::UnixStream;
+
+        let tcp = std::os::unix::net::UnixStream::from_raw_fd(fd);
+        
+        if let Ok(tcp) = UnixStream::from_std(tcp) {
+            heap_ptr(tcp.into())
+        } 
+        else { 
+            ptr::null_mut()
+        }
+    }
+}
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_peek(fut: *mut FfiFuture, ffi: *mut DynStream, buf: *mut FfiSlice){
+pub extern "C" fn tcp_to_fd(stream: *mut DynStream) -> RawFd {
+    unsafe {
+        match &mut *stream {
+            DynStream::Tcp(tcp) => {tcp.as_raw_fd()},
+            _ => 0
+        }
+    }
+}
+#[cfg(feature = "unix-sockets")]
+#[unsafe(no_mangle)]
+pub extern "C" fn unix_to_fd(stream: *mut DynStream) -> RawFd {
+    unsafe {
+        match &mut *stream {
+            DynStream::Unix(unix) => {unix.as_raw_fd()},
+            _ => 0
+        }
+    }
+}
+
+
+#[unsafe(no_mangle)]
+pub extern "C" fn tcp_peek(fut: *mut FfiFuture<usize>, ffi: *mut DynStream, buf: *mut FfiSlice){
     unsafe {
         let ffi = &*ffi;
         let fut = &*fut;
@@ -58,7 +95,7 @@ pub extern "C" fn tcp_peek(fut: *mut FfiFuture, ffi: *mut DynStream, buf: *mut F
 
         if let DynStream::Tcp(tcp) = ffi {
             spawn_task_with(fut, async move {
-                Ok(heap_void_ptr(tcp.peek(buf).await))
+                Ok(heap_ptr(tcp.peek(buf).await?))
             });
         }
         else{
@@ -101,45 +138,45 @@ pub extern "C" fn stream_get_type(stream: *mut DynStream) -> u8 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn stream_read(fut: *mut FfiFuture, stream: *mut DynStream, buf: *mut FfiSlice){
+pub extern "C" fn stream_read(fut: *mut FfiFuture<usize>, stream: *mut DynStream, buf: *mut FfiSlice){
     unsafe {
         let stream = &mut *stream;
         let fut = &*fut;
         let buf = (*buf).as_bytes_mut();
 
         spawn_task_with(fut, async move {
-            Ok(heap_void_ptr(stream.read(buf).await))
+            Ok(heap_ptr(stream.read(buf).await?))
         });
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn stream_read_exact(fut: *mut FfiFuture, stream: *mut DynStream, buf: *mut FfiSlice){
+pub extern "C" fn stream_read_exact(fut: *mut FfiFuture<usize>, stream: *mut DynStream, buf: *mut FfiSlice){
     unsafe {
         let stream = &mut *stream;
         let fut = &*fut;
         let buf = (*buf).as_bytes_mut();
 
         spawn_task_with(fut, async move {
-            Ok(heap_void_ptr(stream.read_exact(buf).await))
+            Ok(heap_ptr(stream.read_exact(buf).await?))
         });
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn stream_write(fut: *mut FfiFuture, stream: *mut DynStream, buf: *mut FfiSlice){
+pub extern "C" fn stream_write(fut: *mut FfiFuture<usize>, stream: *mut DynStream, buf: *mut FfiSlice){
     unsafe {
         let stream = &mut *stream;
         let fut = &*fut;
         let buf = (*buf).as_bytes();
 
         spawn_task_with(fut, async move {
-            Ok(heap_void_ptr(stream.write(buf).await))
+            Ok(heap_ptr(stream.write(buf).await?))
         });
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn stream_write_all(fut: *mut FfiFuture, stream: *mut DynStream, buf: *mut FfiSlice){
+pub extern "C" fn stream_write_all(fut: *mut FfiFuture<usize>, stream: *mut DynStream, buf: *mut FfiSlice){
     unsafe {
         let stream = &mut *stream;
         let fut = &*fut;
@@ -153,7 +190,7 @@ pub extern "C" fn stream_write_all(fut: *mut FfiFuture, stream: *mut DynStream, 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn stream_flush(fut: *mut FfiFuture, stream: *mut DynStream){
+pub extern "C" fn stream_flush(fut: *mut FfiFuture<c_void>, stream: *mut DynStream){
     unsafe {
         let stream = &mut *stream;
         let fut = &*fut;
@@ -166,7 +203,7 @@ pub extern "C" fn stream_flush(fut: *mut FfiFuture, stream: *mut DynStream){
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn stream_shutdown(fut: *mut FfiFuture, stream: *mut DynStream){
+pub extern "C" fn stream_shutdown(fut: *mut FfiFuture<c_void>, stream: *mut DynStream){
     unsafe {
         let stream = &mut *stream;
         let fut = &*fut;

@@ -110,11 +110,11 @@ impl<R: ReadStream, W: WriteStream> Http2Socket<R, W> {
         Ok(&self.client)
     }
 
-    pub fn add_header(&mut self, header: &str, value: &str) {
+    pub fn add_header(&mut self, header: &str, value: String) {
         if let Some(hs) = self.headers.get_mut(header) { hs.push(value.to_owned()); }
         else { self.headers.insert(header.to_owned(), vec![ value.to_owned() ]); }
     }
-    pub fn set_header(&mut self, header: &str, value: &str){
+    pub fn set_header(&mut self, header: &str, value: String){
         self.headers.insert(header.to_owned(), vec![ value.to_owned() ]);
     }
     pub fn del_header(&mut self, header: &str) -> Option<Vec<String>>{
@@ -150,7 +150,7 @@ impl<R: ReadStream, W: WriteStream> Http2Socket<R, W> {
     }
     pub async fn close(&mut self, buf: &[u8]) -> LibResult<()> {
         if !self.sent_head {
-            self.set_header("content-length", &buf.len().to_string());
+            self.set_header("content-length", buf.len().to_string());
             self.send_head(false).await?;
         }
         self.session.send_data(self.stream_id, true, buf).await
@@ -179,8 +179,8 @@ impl<R: ReadStream, W: WriteStream> HttpSocket for Http2Socket<R, W>{
         self.read_until_head_complete()
     }
 
-    #[inline] fn add_header(&mut self, header: &str, value: &str) { self.add_header(&header.to_lowercase(), value) }
-    #[inline] fn set_header(&mut self, header: &str, value: &str){ self.set_header(&header.to_lowercase(), value) }
+    #[inline] fn add_header(&mut self, header: &str, value: String) { self.add_header(&header.to_lowercase(), value) }
+    #[inline] fn set_header(&mut self, header: &str, value: String){ self.set_header(&header.to_lowercase(), value) }
     #[inline] fn del_header(&mut self, header: &str) -> Option<Vec<String>>{ self.del_header(&header.to_lowercase()) }
 
     #[inline]

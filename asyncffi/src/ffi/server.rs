@@ -1,10 +1,10 @@
-use std::{ffi::CStr, net::SocketAddr, os::fd::{FromRawFd, RawFd}, ptr};
+use std::{ffi::{CStr, c_void}, net::SocketAddr, os::fd::{FromRawFd, RawFd}, ptr};
 
-use http::{http1::server::Http1Socket, shared::{HttpClient, HttpMethod, HttpSocket, HttpType, HttpVersion}};
+use http::{http1::server::Http1Socket, http2::session::Http2Session, shared::{HttpClient, HttpMethod, HttpSocket, HttpType, HttpVersion}, websocket::socket::WebSocket};
 use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice, own::spawn_task};
-use tokio::{io::AsyncWriteExt, net::TcpListener};
+use tokio::{io::{AsyncWriteExt, BufReader, ReadHalf, WriteHalf}, net::TcpListener};
 
-use crate::{DynStream, errno::{Errno, TYPE_ERR}, ffi::utils::{heap_ptr, heap_void_ptr}, servers::{DynHttpSocket, detect_prot}, spawn_task_with};
+use crate::{DynStream, errno::{Errno, TYPE_ERR}, ffi::utils::heap_ptr, servers::{DynHttpSocket, detect_prot}, spawn_task_with};
 
 
 #[repr(C)]
@@ -126,14 +126,14 @@ impl FfiClient{
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_server_new(fut: *mut FfiFuture, string: *mut i8){
+pub extern "C" fn tcp_server_new(fut: *mut FfiFuture<TcpListener>, string: *mut i8){
     unsafe {
         let addr = CStr::from_ptr(string).to_string_lossy().to_string();
         let fut = &*fut;
 
         spawn_task_with(fut, async move {
             let lis = TcpListener::bind(addr).await?;
-            Ok(heap_void_ptr(lis))
+            Ok(heap_ptr(lis))
         });
     }
 }
@@ -159,7 +159,7 @@ pub extern "C" fn tcp_server_free(listener: *mut TcpListener) {
 
 // #[allow(improper_ctypes_definitions)]
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_server_accept(fut: *mut FfiFuture, server: *mut TcpListener){
+pub extern "C" fn tcp_server_accept(fut: *mut FfiFuture<FfiBundle>, server: *mut TcpListener){
     unsafe {
         let server = &mut *server;
         let fut = &*fut;
@@ -176,7 +176,7 @@ pub extern "C" fn tcp_server_accept(fut: *mut FfiFuture, server: *mut TcpListene
                 addr,
             };
 
-            Ok(heap_void_ptr(ffi))
+            Ok(heap_ptr(ffi))
         });
     }
 }
@@ -224,14 +224,14 @@ pub extern "C" fn get_addr_str(addr: *const SocketAddr) -> FfiSlice{
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_detect_prot(fut: *mut FfiFuture, stream: *mut DynStream){
+pub extern "C" fn tcp_detect_prot(fut: *mut FfiFuture<u8>, stream: *mut DynStream){
     unsafe {
         let stream = &mut *stream;
         let fut = &*fut;
 
         spawn_task(async move {
             if let DynStream::Tcp(tcp) = stream {
-                fut.complete(heap_void_ptr(detect_prot(tcp).await))
+                fut.complete(heap_ptr(detect_prot(tcp).await))
             }
             else {
                 fut.cancel_with_err(TYPE_ERR, "socket not tcp".into())
@@ -262,7 +262,7 @@ pub extern "C" fn http_get_type(http: *mut DynHttpSocket) -> u8{
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http_read_client(fut: *mut FfiFuture, http: *mut DynHttpSocket){
+pub extern "C" fn http_read_client(fut: *mut FfiFuture<c_void>, http: *mut DynHttpSocket){
     unsafe{
         let http = &mut *http;
         let fut = &*fut;
@@ -274,7 +274,7 @@ pub extern "C" fn http_read_client(fut: *mut FfiFuture, http: *mut DynHttpSocket
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http_read_until_complete(fut: *mut FfiFuture, http: *mut DynHttpSocket){
+pub extern "C" fn http_read_until_complete(fut: *mut FfiFuture<c_void>, http: *mut DynHttpSocket){
     unsafe{
         let http = &mut *http;
         let fut = &*fut;
@@ -286,7 +286,7 @@ pub extern "C" fn http_read_until_complete(fut: *mut FfiFuture, http: *mut DynHt
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http_read_until_head_complete(fut: *mut FfiFuture, http: *mut DynHttpSocket){
+pub extern "C" fn http_read_until_head_complete(fut: *mut FfiFuture<c_void>, http: *mut DynHttpSocket){
     unsafe{
         let http = &mut *http;
         let fut = &*fut;
@@ -304,7 +304,7 @@ pub extern "C" fn http_set_header(http: *mut DynHttpSocket, pair: FfiHeaderPair)
         let name = pair.nam.as_str_lossy();
         let value = pair.val.as_str_lossy();
 
-        (*http).set_header(&name, &value);
+        (*http).set_header(&name, value.into_owned());
     }
 }
 #[unsafe(no_mangle)]
@@ -313,7 +313,7 @@ pub extern "C" fn http_add_header(http: *mut DynHttpSocket, pair: FfiHeaderPair)
         let name = pair.nam.as_str_lossy();
         let value = pair.val.as_str_lossy();
 
-        (*http).add_header(&name, &value);
+        (*http).add_header(&name, value.into_owned());
     }
 }
 #[unsafe(no_mangle)]
@@ -325,7 +325,7 @@ pub extern "C" fn http_del_header(http: *mut DynHttpSocket, name: FfiSlice){
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http_write(fut: *mut FfiFuture, http: *mut DynHttpSocket, buf: FfiSlice){
+pub extern "C" fn http_write(fut: *mut FfiFuture<c_void>, http: *mut DynHttpSocket, buf: FfiSlice){
     unsafe{
         let http = &mut *http;
         let fut = &*fut;
@@ -337,7 +337,7 @@ pub extern "C" fn http_write(fut: *mut FfiFuture, http: *mut DynHttpSocket, buf:
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http_close(fut: *mut FfiFuture, http: *mut DynHttpSocket, buf: FfiSlice){
+pub extern "C" fn http_close(fut: *mut FfiFuture<c_void>, http: *mut DynHttpSocket, buf: FfiSlice){
     unsafe{
         let http = &mut *http;
         let fut = &*fut;
@@ -349,7 +349,7 @@ pub extern "C" fn http_close(fut: *mut FfiFuture, http: *mut DynHttpSocket, buf:
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http_flush(fut: *mut FfiFuture, http: *mut DynHttpSocket){
+pub extern "C" fn http_flush(fut: *mut FfiFuture<c_void>, http: *mut DynHttpSocket){
     unsafe{
         let fut = &*fut;
         let http = &mut *http;
@@ -451,7 +451,7 @@ pub extern "C" fn http_free(http: *mut DynHttpSocket){
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http1_direct_write(fut: *mut FfiFuture, http: *mut DynHttpSocket, buf: FfiSlice){
+pub extern "C" fn http1_direct_write(fut: *mut FfiFuture<c_void>, http: *mut DynHttpSocket, buf: FfiSlice){
     unsafe{
         let http = &mut *http;
         let fut = &*fut;
@@ -470,7 +470,7 @@ pub extern "C" fn http1_direct_write(fut: *mut FfiFuture, http: *mut DynHttpSock
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http1_websocket(fut: *mut FfiFuture, http: *mut DynHttpSocket){
+pub extern "C" fn http1_websocket(fut: *mut FfiFuture<WebSocket<BufReader<ReadHalf<DynStream>>, WriteHalf<DynStream>>>, http: *mut DynHttpSocket){
     unsafe{
         let http = *Box::from_raw(http);
         let fut = &*fut;
@@ -479,7 +479,7 @@ pub extern "C" fn http1_websocket(fut: *mut FfiFuture, http: *mut DynHttpSocket)
             DynHttpSocket::Http1(one) => {
                 spawn_task_with(fut, async move {
                     let ws = one.websocket().await?;
-                    Ok(heap_void_ptr(ws))
+                    Ok(heap_ptr(ws))
                 })
             }
             _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),
@@ -488,7 +488,7 @@ pub extern "C" fn http1_websocket(fut: *mut FfiFuture, http: *mut DynHttpSocket)
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http1_h2c(fut: *mut FfiFuture, http: *mut DynHttpSocket){
+pub extern "C" fn http1_h2c(fut: *mut FfiFuture<Http2Session<BufReader<ReadHalf<DynStream>>, WriteHalf<DynStream>>>, http: *mut DynHttpSocket){
     unsafe{
         let http = *Box::from_raw(http);
         let fut = &*fut;
@@ -497,7 +497,7 @@ pub extern "C" fn http1_h2c(fut: *mut FfiFuture, http: *mut DynHttpSocket){
             DynHttpSocket::Http1(one) => {
                 spawn_task_with(fut, async move {
                     let h2 = one.h2c(None).await?;
-                    Ok(heap_void_ptr(h2))
+                    Ok(heap_ptr(h2))
                 })
             }
             _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),
@@ -505,7 +505,7 @@ pub extern "C" fn http1_h2c(fut: *mut FfiFuture, http: *mut DynHttpSocket){
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http1_h2_prior_knowledge(fut: *mut FfiFuture, http: *mut DynHttpSocket){
+pub extern "C" fn http1_h2_prior_knowledge(fut: *mut FfiFuture<Http2Session<BufReader<ReadHalf<DynStream>>, WriteHalf<DynStream>>>, http: *mut DynHttpSocket){
     unsafe{
         let http = *Box::from_raw(http);
         let fut = &*fut;
@@ -514,7 +514,7 @@ pub extern "C" fn http1_h2_prior_knowledge(fut: *mut FfiFuture, http: *mut DynHt
             DynHttpSocket::Http1(one) => {
                 spawn_task_with(fut, async move {
                     let h2 = one.http2_prior_knowledge().await?;
-                    Ok(heap_void_ptr(h2))
+                    Ok(heap_ptr(h2))
                 })
             }
             _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),

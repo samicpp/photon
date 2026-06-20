@@ -91,7 +91,7 @@ pub struct Http2Session<R: ReadStream, W: WriteStream>{
     pub streams: DashMap<u32, Http2Data>,
 
     pub goaway: AtomicBool,
-    pub goaway_frame: SyncMutex<Option<Http2Frame<'static>>>,
+    pub goaway_frame: SyncMutex<Option<Http2Frame<'static, 0>>>,
 
     pub window: SyncMutex<usize>,
     pub notify: Notify,
@@ -502,8 +502,16 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
 
 
 
-    pub async fn write_frame(&self, ftype: Http2FrameType, flags: u8, stream_id: u32, priority: Option<&[u8]>, payload: Option<&[u8]>, padding: Option<&[u8]>) -> io::Result<()> {
-        self.netw.lock().await.write_all(&Http2Frame::create(ftype, flags, stream_id, priority, payload, padding)).await
+    pub async fn write_frame(&self, ftype: Http2FrameType, flags: u8, stream_id: u32, priority: Option<&[u8]>, payload: Option<&[u8]>, padding: Option<&[u8]>) -> LibResult<()> {
+        let length = match priority { Some(s) => s.len(), None => 0} + match payload { Some(s) => s.len(), None => 0} + match padding { Some(s) => s.len() + 1, None => 0};
+        let mut frame = vec![0; 9 + length];
+        if let None = Http2Frame::write(&mut frame, ftype.into(), flags, stream_id, priority, payload, padding) {
+            Err(LibError::InvalidFrame)
+        }
+        else {
+            self.netw.lock().await.write_all(&frame).await?;
+            Ok(())
+        }
     }
 
     pub async fn send_data(&self, stream_id: u32, end: bool, buf: &[u8]) -> LibResult<()> {
@@ -562,10 +570,10 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
                     let end_pos = pos + mfs;
                     
                     if end_pos == buf.len() {
-                        buff.append(&mut Http2Frame::create(Http2FrameType::Data, if end { 1 } else { 0 }, stream_id, None, Some(&buf[pos..end_pos]), None));
+                        buff.append(&mut Http2Frame::create_heap(Http2FrameType::Data, if end { 1 } else { 0 }, stream_id, None, Some(&buf[pos..end_pos]), None)?);
                     }
                     else {
-                        buff.append(&mut Http2Frame::create(Http2FrameType::Data, 0, stream_id, None, Some(&buf[pos..end_pos]), None));
+                        buff.append(&mut Http2Frame::create_heap(Http2FrameType::Data, 0, stream_id, None, Some(&buf[pos..end_pos]), None)?);
                     }
 
                     pos += mfs;
@@ -575,10 +583,10 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
                 let end_pos = pos + rem;
 
                 if end_pos == buf.len() {
-                    buff.append(&mut Http2Frame::create(Http2FrameType::Data, if end { 1 } else { 0 }, stream_id, None, Some(&buf[pos..end_pos]), None));
+                    buff.append(&mut Http2Frame::create_heap(Http2FrameType::Data, if end { 1 } else { 0 }, stream_id, None, Some(&buf[pos..end_pos]), None)?);
                 }
                 else {
-                    buff.append(&mut Http2Frame::create(Http2FrameType::Data, 0, stream_id, None, Some(&buf[pos..end_pos]), None));
+                    buff.append(&mut Http2Frame::create_heap(Http2FrameType::Data, 0, stream_id, None, Some(&buf[pos..end_pos]), None)?);
                 }
 
                 pos += rem;
@@ -644,10 +652,10 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
 
         
         if enc.len() < mfs {
-            buff.append(&mut Http2Frame::create(Http2FrameType::Headers, if end { 5 } else { 4 }, stream_id, None, Some(&enc), None));
+            buff.append(&mut Http2Frame::create_heap(Http2FrameType::Headers, if end { 5 } else { 4 }, stream_id, None, Some(&enc), None)?);
         }
         else {
-            buff.append(&mut Http2Frame::create(Http2FrameType::Headers, 0, stream_id, None, Some(&enc[pos..pos + mfs]), None));
+            buff.append(&mut Http2Frame::create_heap(Http2FrameType::Headers, 0, stream_id, None, Some(&enc[pos..pos + mfs]), None)?);
             pos += mfs;
 
             let mut chunks = enc.len() / mfs;
@@ -658,11 +666,11 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
             }
 
             for _ in 0..chunks {
-                buff.append(&mut Http2Frame::create(Http2FrameType::Continuation, 0, stream_id, None, Some(&enc[pos..pos + mfs]), None));
+                buff.append(&mut Http2Frame::create_heap(Http2FrameType::Continuation, 0, stream_id, None, Some(&enc[pos..pos + mfs]), None)?);
                 pos += mfs;
             }
 
-            buff.append(&mut Http2Frame::create(Http2FrameType::Continuation, if end { 5 } else { 4 }, stream_id, None, Some(&enc[pos..]), None));
+            buff.append(&mut Http2Frame::create_heap(Http2FrameType::Continuation, if end { 5 } else { 4 }, stream_id, None, Some(&enc[pos..]), None)?);
         }
 
         self.netw.lock().await.write_all(&buff).await?;
@@ -672,17 +680,17 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
     }
 
     #[inline]
-    pub async fn send_priority(&self, stream_id: u32, dependency: u32, weight: u8) -> io::Result<()> {
+    pub async fn send_priority(&self, stream_id: u32, dependency: u32, weight: u8) -> LibResult<()> {
         self.write_frame(Http2FrameType::Priority, 0, stream_id, None, Some(&[(dependency >> 24) as u8, (dependency >> 16) as u8, (dependency >> 8) as u8, dependency as u8, weight]), None).await
     }
     
     #[inline]
-    pub async fn send_rst_stream(&self, stream_id: u32, code: u32) -> io::Result<()> { 
+    pub async fn send_rst_stream(&self, stream_id: u32, code: u32) -> LibResult<()> { 
         self.write_frame(Http2FrameType::RstStream, 0, stream_id, None, Some(&u32::to_be_bytes(code)), None).await
     }
 
     #[inline]
-    pub async fn send_settings(&self, settings: Http2Settings) -> io::Result<()> { 
+    pub async fn send_settings(&self, settings: Http2Settings) -> LibResult<()> { 
         self.write_frame(Http2FrameType::Settings, 0, 0, None, Some(&settings.to_vec()), None).await
     }
     
@@ -725,14 +733,14 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
             pay.extend_from_slice(&u32::to_be_bytes(promise_id));
             pay.extend_from_slice(&enc);
 
-            buff.append(&mut Http2Frame::create(Http2FrameType::PushPromise, 4, associate_id, None, Some(&pay), None));
+            buff.append(&mut Http2Frame::create_heap(Http2FrameType::PushPromise, 4, associate_id, None, Some(&pay), None)?);
         }
         else {
             let mut pay = Vec::with_capacity(mfs);
             pay.extend_from_slice(&u32::to_be_bytes(promise_id));
             pay.extend_from_slice(&enc[pos..pos + mfs - 4]);
 
-            buff.append(&mut Http2Frame::create(Http2FrameType::PushPromise, 0, associate_id, None, Some(&pay), None));
+            buff.append(&mut Http2Frame::create_heap(Http2FrameType::PushPromise, 0, associate_id, None, Some(&pay), None)?);
             pos += mfs - 4;
 
             let mut chunks = enc.len() / mfs;
@@ -743,11 +751,11 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
             }
 
             for _ in 0..chunks {
-                buff.append(&mut Http2Frame::create(Http2FrameType::Continuation, 0, associate_id, None, Some(&enc[pos..pos + mfs]), None));
+                buff.append(&mut Http2Frame::create_heap(Http2FrameType::Continuation, 0, associate_id, None, Some(&enc[pos..pos + mfs]), None)?);
                 pos += mfs;
             }
 
-            buff.append(&mut Http2Frame::create(Http2FrameType::Continuation, 4, associate_id, None, Some(&enc[pos..]), None));
+            buff.append(&mut Http2Frame::create_heap(Http2FrameType::Continuation, 4, associate_id, None, Some(&enc[pos..]), None)?);
         }
 
         self.netw.lock().await.write_all(&buff).await?;
@@ -757,11 +765,11 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
     }
     
     #[inline]
-    pub async fn send_ping(&self, ack: bool, buf: &[u8]) -> io::Result<()> { 
+    pub async fn send_ping(&self, ack: bool, buf: &[u8]) -> LibResult<()> { 
         self.write_frame(Http2FrameType::Ping, if ack { 1 } else { 0 }, 0, None, Some(buf), None).await
     }
     
-    pub async fn send_goaway(&self, stream_id: u32, code: u32, buf: &[u8]) -> io::Result<()> {
+    pub async fn send_goaway(&self, stream_id: u32, code: u32, buf: &[u8]) -> LibResult<()> {
         let mut pay = vec![];
         
         pay.extend_from_slice(&u32::to_be_bytes(stream_id));
@@ -772,7 +780,7 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
     }
     
     #[inline]
-    pub async fn send_window_update(&self, stream_id: u32, size: u32) -> io::Result<()> {
+    pub async fn send_window_update(&self, stream_id: u32, size: u32) -> LibResult<()> {
         self.write_frame(Http2FrameType::WindowUpdate, 0, stream_id, None, Some(&u32::to_be_bytes(size)), None).await
     }
     

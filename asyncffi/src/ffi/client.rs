@@ -1,9 +1,10 @@
-use std::{ffi::CStr, ptr};
+use std::{ffi::{CStr, c_void}, ptr};
 
-use http::{http1::client::Http1Request, shared::{HttpMethod, HttpRequest, HttpResponse, HttpType}};
+use http::{http1::client::Http1Request, http2::session::Http2Session, shared::{HttpMethod, HttpRequest, HttpResponse, HttpType}, websocket::socket::WebSocket};
 use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice};
+use tokio::io::{BufReader, ReadHalf, WriteHalf};
 
-use crate::{DynStream, clients::{DynHttpRequest, tcp_connect as ntcpconn, tls_upgrade, tls_upgrade_no_verification}, errno::TYPE_ERR, ffi::{const_enums::methods, server::FfiHeaderPair, utils::{heap_ptr, heap_void_ptr}}, spawn_task_with};
+use crate::{DynStream, clients::{DynHttpRequest, tcp_connect as ntcpconn, tls_upgrade, tls_upgrade_no_verification}, errno::TYPE_ERR, ffi::{const_enums::methods, server::FfiHeaderPair, utils::heap_ptr}, spawn_task_with};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -83,21 +84,21 @@ impl FfiResponse{
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_connect(fut: *mut FfiFuture, addr: *mut i8){
+pub extern "C" fn tcp_connect(fut: *mut FfiFuture<DynStream>, addr: *mut i8){
     unsafe{
         let addr = CStr::from_ptr(addr).to_string_lossy().to_string();
         let fut = &*fut;
 
         spawn_task_with(fut, async move {
             let tcp = ntcpconn(addr).await?;
-            let ptr = heap_void_ptr(DynStream::from(tcp));
+            let ptr = heap_ptr(DynStream::from(tcp));
             Ok(ptr)
         });
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_tls_connect(fut: *mut FfiFuture, addr: *mut i8, domain: *mut i8, alpns: *mut i8){
+pub extern "C" fn tcp_tls_connect(fut: *mut FfiFuture<DynStream>, addr: *mut i8, domain: *mut i8, alpns: *mut i8){
     unsafe{
         let addr = CStr::from_ptr(addr).to_string_lossy().to_string();
         let domain = CStr::from_ptr(domain).to_string_lossy().to_string();
@@ -108,13 +109,13 @@ pub extern "C" fn tcp_tls_connect(fut: *mut FfiFuture, addr: *mut i8, domain: *m
         spawn_task_with(fut, async move {
             let tcp = ntcpconn(addr).await?;
             let tls = tls_upgrade(tcp, domain, alpns).await?;
-            let ptr = heap_void_ptr(DynStream::from(tls));
+            let ptr = heap_ptr(DynStream::from(tls));
             Ok(ptr)
         });
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_tls_connect_unverified(fut: *mut FfiFuture, addr: *mut i8, domain: *mut i8, alpns: *mut i8){
+pub extern "C" fn tcp_tls_connect_unverified(fut: *mut FfiFuture<DynStream>, addr: *mut i8, domain: *mut i8, alpns: *mut i8){
     unsafe{
         let addr = CStr::from_ptr(addr).to_string_lossy().to_string();
         let domain = CStr::from_ptr(domain).to_string_lossy().to_string();
@@ -125,7 +126,7 @@ pub extern "C" fn tcp_tls_connect_unverified(fut: *mut FfiFuture, addr: *mut i8,
         spawn_task_with(fut, async move {
             let tcp = ntcpconn(addr).await?;
             let tls = tls_upgrade_no_verification(tcp, domain, alpns).await?;
-            let ptr = heap_void_ptr(DynStream::from(tls));
+            let ptr = heap_ptr(DynStream::from(tls));
             Ok(ptr)
         });
     }
@@ -157,7 +158,7 @@ pub extern "C" fn http_req_set_header(req: *mut DynHttpRequest, pair: FfiHeaderP
         let name = pair.nam.as_str_lossy();
         let value = pair.val.as_str_lossy();
 
-        (*req).set_header(&name, &value);
+        (*req).set_header(&name, value.into_owned());
     }
 }
 #[unsafe(no_mangle)]
@@ -166,7 +167,7 @@ pub extern "C" fn http_req_add_header(req: *mut DynHttpRequest, pair: FfiHeaderP
         let name = pair.nam.as_str_lossy();
         let value = pair.val.as_str_lossy();
 
-        (*req).add_header(&name, &value);
+        (*req).add_header(&name, value.into_owned());
     }
 }
 #[unsafe(no_mangle)]
@@ -210,7 +211,7 @@ pub extern "C" fn http_req_set_path(req: *mut DynHttpRequest, path: FfiSlice){
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http_req_write(fut: *mut FfiFuture, req: *mut DynHttpRequest, buf: FfiSlice){
+pub extern "C" fn http_req_write(fut: *mut FfiFuture<c_void>, req: *mut DynHttpRequest, buf: FfiSlice){
     unsafe{
         let req = &mut *req;
         let fut = &*fut;
@@ -221,7 +222,7 @@ pub extern "C" fn http_req_write(fut: *mut FfiFuture, req: *mut DynHttpRequest, 
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http_req_send(fut: *mut FfiFuture, req: *mut DynHttpRequest, buf: FfiSlice){
+pub extern "C" fn http_req_send(fut: *mut FfiFuture<c_void>, req: *mut DynHttpRequest, buf: FfiSlice){
     unsafe{
         let req = &mut *req;
         let fut = &*fut;
@@ -233,7 +234,7 @@ pub extern "C" fn http_req_send(fut: *mut FfiFuture, req: *mut DynHttpRequest, b
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http_req_flush(fut: *mut FfiFuture, req: *mut DynHttpRequest){
+pub extern "C" fn http_req_flush(fut: *mut FfiFuture<c_void>, req: *mut DynHttpRequest){
     unsafe{
         let fut = &*fut;
         let req = &mut *req;
@@ -245,7 +246,7 @@ pub extern "C" fn http_req_flush(fut: *mut FfiFuture, req: *mut DynHttpRequest){
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http_req_read(fut: *mut FfiFuture, req: *mut DynHttpRequest){
+pub extern "C" fn http_req_read(fut: *mut FfiFuture<c_void>, req: *mut DynHttpRequest){
     unsafe{
         let req = &mut *req;
         let fut = &*fut;
@@ -257,7 +258,7 @@ pub extern "C" fn http_req_read(fut: *mut FfiFuture, req: *mut DynHttpRequest){
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http_req_read_until_complete(fut: *mut FfiFuture, req: *mut DynHttpRequest){
+pub extern "C" fn http_req_read_until_complete(fut: *mut FfiFuture<c_void>, req: *mut DynHttpRequest){
     unsafe{
         let req = &mut *req;
         let fut = &*fut;
@@ -269,7 +270,7 @@ pub extern "C" fn http_req_read_until_complete(fut: *mut FfiFuture, req: *mut Dy
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http_req_read_until_head_complete(fut: *mut FfiFuture, req: *mut DynHttpRequest){
+pub extern "C" fn http_req_read_until_head_complete(fut: *mut FfiFuture<c_void>, req: *mut DynHttpRequest){
     unsafe{
         let req = &mut *req;
         let fut = &*fut;
@@ -348,7 +349,7 @@ pub extern "C" fn http_req_free(req: *mut DynHttpRequest){
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http1_websocket_strict(fut: *mut FfiFuture, http: *mut DynHttpRequest){
+pub extern "C" fn http1_websocket_strict(fut: *mut FfiFuture<WebSocket<BufReader<ReadHalf<DynStream>>, WriteHalf<DynStream>>>, http: *mut DynHttpRequest){
     unsafe{
         let http = *Box::from_raw(http);
         let fut = &*fut;
@@ -357,7 +358,7 @@ pub extern "C" fn http1_websocket_strict(fut: *mut FfiFuture, http: *mut DynHttp
             DynHttpRequest::Http1(one) => {
                 spawn_task_with(fut, async move {
                     let ws = one.websocket_strict().await?;
-                    Ok(heap_void_ptr(ws))
+                    Ok(heap_ptr(ws))
                 })
             }
             _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),
@@ -365,7 +366,7 @@ pub extern "C" fn http1_websocket_strict(fut: *mut FfiFuture, http: *mut DynHttp
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http1_websocket_lazy(fut: *mut FfiFuture, http: *mut DynHttpRequest){
+pub extern "C" fn http1_websocket_lazy(fut: *mut FfiFuture<WebSocket<BufReader<ReadHalf<DynStream>>, WriteHalf<DynStream>>>, http: *mut DynHttpRequest){
     unsafe{
         let http = *Box::from_raw(http);
         let fut = &*fut;
@@ -374,7 +375,7 @@ pub extern "C" fn http1_websocket_lazy(fut: *mut FfiFuture, http: *mut DynHttpRe
             DynHttpRequest::Http1(one) => {
                 spawn_task_with(fut, async move {
                     let ws = one.websocket_lazy().await?;
-                    Ok(heap_void_ptr(ws))
+                    Ok(heap_ptr(ws))
                 })
             }
             _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),
@@ -383,7 +384,7 @@ pub extern "C" fn http1_websocket_lazy(fut: *mut FfiFuture, http: *mut DynHttpRe
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http1_h2c_full(fut: *mut FfiFuture, http: *mut DynHttpRequest){
+pub extern "C" fn http1_h2c_full(fut: *mut FfiFuture<Http2Session<BufReader<ReadHalf<DynStream>>, WriteHalf<DynStream>>>, http: *mut DynHttpRequest){
     unsafe{
         let http = *Box::from_raw(http);
         let fut = &*fut;
@@ -392,7 +393,7 @@ pub extern "C" fn http1_h2c_full(fut: *mut FfiFuture, http: *mut DynHttpRequest)
             DynHttpRequest::Http1(one) => {
                 spawn_task_with(fut, async move {
                     let h2 = one.h2c_full(None).await?;
-                    Ok(heap_void_ptr(h2))
+                    Ok(heap_ptr(h2))
                 })
             }
             _ => fut.cancel_with_err(TYPE_ERR, "not http1".into()),

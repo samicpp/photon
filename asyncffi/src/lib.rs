@@ -1,4 +1,4 @@
-use std::{ffi::c_void, pin::Pin, sync::{Arc, LazyLock}};
+use std::{pin::Pin, sync::{Arc, LazyLock}};
 
 use http::shared::{LibError, Stream};
 use httprs_core::ffi::{futures::FfiFuture, own::spawn_task};
@@ -21,12 +21,12 @@ pub mod clients;
 
 #[cfg(feature = "aws-lc-rs")]
 pub static PROVIDER: LazyLock<Arc<CryptoProvider>> = LazyLock::new(|| Arc::new(rustls::crypto::aws_lc_rs::default_provider()));
-#[cfg(feature = "ring")]
+#[cfg(all(feature = "ring", not(feature = "aws-lc-rs")))]
 pub static PROVIDER: LazyLock<Arc<CryptoProvider>> = LazyLock::new(|| Arc::new(rustls::crypto::ring::default_provider()));
 #[cfg(not(any(feature = "ring", feature = "aws-lc-rs")))]
 pub static PROVIDER: LazyLock<Arc<CryptoProvider>> = LazyLock::new(|| rustls::crypto::CryptoProvider::get_default().unwrap().clone());
-#[cfg(not(any(feature = "ring", feature = "aws-lc-rs")))]
-compile_error!("You must enable either feature \"ring\" or \"aws-lc-rs\"");
+// #[cfg(not(any(feature = "ring", feature = "aws-lc-rs")))]
+// compile!("You must enable either feature \"ring\" or \"aws-lc-rs\"");
 
 
 
@@ -245,7 +245,7 @@ impl AsyncWrite for DynStream {
     }
 }
 
-pub fn spawn_task_with<F: Future<Output = Result<*mut c_void, LibError>> + Send + 'static>(fut: &'static FfiFuture, future: F) {
+pub fn spawn_task_with<T, F: Future<Output = Result<*mut T, LibError>> + Send + 'static>(fut: &'static FfiFuture<T>, future: F) {
     spawn_task(async move {
         match future.await {
             Ok(ptr) => fut.complete(ptr),

@@ -53,12 +53,12 @@ impl<R: ReadStream, W: WriteStream> Http1Request<R, W>{
         }
     }
 
-    pub fn add_header(&mut self, header: &str, value: &str) {
-        if let Some(hs) = self.headers.get_mut(header) { hs.push(value.to_owned()); }
-        else { self.headers.insert(header.to_owned(), vec![ value.to_owned() ]); }
+    pub fn add_header(&mut self, header: &str, value: String) {
+        if let Some(hs) = self.headers.get_mut(header) { hs.push(value); }
+        else { self.headers.insert(header.to_owned(), vec![ value ]); }
     }
-    pub fn set_header(&mut self, header: &str, value: &str){
-        self.headers.insert(header.to_owned(), vec![ value.to_owned() ]);
+    pub fn set_header(&mut self, header: &str, value: String){
+        self.headers.insert(header.to_owned(), vec![ value ]);
     }
     pub fn del_header(&mut self, header: &str) -> Option<Vec<String>>{
         self.headers.remove(header)
@@ -234,10 +234,10 @@ impl<R: ReadStream, W: WriteStream> Http1Request<R, W>{
 
         let wskey = b64std.encode(key);
         
-        self.set_header("Connection", "upgrade");
-        self.set_header("Upgrade", "websocket");
-        self.set_header("Sec-WebSocket-Version", "13");
-        self.set_header("Sec-WebSocket-Key", &wskey);
+        self.set_header("Connection", "upgrade".into());
+        self.set_header("Upgrade", "websocket".into());
+        self.set_header("Sec-WebSocket-Version", "13".into());
+        self.set_header("Sec-WebSocket-Key", wskey.clone());
 
         self.send(b"").await?;
         Ok(wskey)
@@ -248,21 +248,35 @@ impl<R: ReadStream, W: WriteStream> Http1Request<R, W>{
     pub async fn websocket_unchecked(mut self) -> LibResult<WebSocket<BufReader<R>, W>> {
         let mut key = [0; 16];
         rand::rng().fill(&mut key);
-        let _ = self.websocket_upgrade(&key).await?;
+        let wskey = b64std.encode(key);
         
-        Ok(self.websocket_direct())
+        self.set_header("Connection", "upgrade".into());
+        self.set_header("Upgrade", "websocket".into());
+        self.set_header("Sec-WebSocket-Version", "13".into());
+        self.set_header("Sec-WebSocket-Key", wskey);
+
+        self.send(b"").await?;
+        
+        Ok(WebSocket::with_split(self.netr, self.netw))
     }
     pub async fn websocket_lazy(mut self) -> LibResult<WebSocket<BufReader<R>, W>>{
         let mut key = [0; 16];
         rand::rng().fill(&mut key);
-        let _ = self.websocket_upgrade(&key).await?;
+        let wskey = b64std.encode(key);
+        
+        self.set_header("Connection", "upgrade".into());
+        self.set_header("Upgrade", "websocket".into());
+        self.set_header("Sec-WebSocket-Version", "13".into());
+        self.set_header("Sec-WebSocket-Key", wskey);
+
+        self.send(b"").await?;
         
         let res = self.read_until_head_complete().await?;
         if res.code != 101 {
             Err(LibError::NotAccepted)
         }
         else {
-            Ok(self.websocket_direct())
+            Ok(WebSocket::with_split(self.netr, self.netw))
         }
     }
     pub async fn websocket_strict(mut self) -> LibResult<WebSocket<BufReader<R>, W>>{
@@ -280,7 +294,7 @@ impl<R: ReadStream, W: WriteStream> Http1Request<R, W>{
             Err(LibError::NotAccepted)
         }
         else if let Some(reskey) = res.headers.get("sec-websocket-accept") && reskey[0] == acckey {
-            Ok(self.websocket_direct())
+            Ok(WebSocket::with_split(self.netr, self.netw))
         }
         else {
             Err(LibError::InvalidUpgrade)
@@ -304,13 +318,13 @@ impl<R: ReadStream, W: WriteStream> Http1Request<R, W>{
         if self.sent_head { return Err(LibError::HeadersSent); }
 
         if let Some(settings) = settings {
-            self.set_header("Connection", "Upgrade, HTTP2-Settings");
-            self.set_header("Upgrade", "h2c");
-            self.set_header("HTTP2-Settings", &b64std.encode(settings.to_vec()));
+            self.set_header("Connection", "Upgrade, HTTP2-Settings".into());
+            self.set_header("Upgrade", "h2c".into());
+            self.set_header("HTTP2-Settings", b64std.encode(settings.to_vec()));
         }
         else {
-            self.set_header("Upgrade", "h2c");
-            self.set_header("Connection", "Upgrade");
+            self.set_header("Upgrade", "h2c".into());
+            self.set_header("Connection", "Upgrade".into());
         }
         
         self.send(body).await
@@ -361,8 +375,8 @@ impl<R: ReadStream, W: WriteStream> HttpRequest for Http1Request<R, W>{
     }
 
 
-    #[inline] fn add_header(&mut self, header: &str, value: &str) { self.add_header(header, value) }
-    #[inline] fn set_header(&mut self, header: &str, value: &str){ self.set_header(header, value) }
+    #[inline] fn add_header(&mut self, header: &str, value: String) { self.add_header(header, value) }
+    #[inline] fn set_header(&mut self, header: &str, value: String){ self.set_header(header, value) }
     #[inline] fn del_header(&mut self, header: &str) -> Option<Vec<String>>{ self.del_header(header) }
 
     #[inline]
@@ -379,7 +393,7 @@ impl<R: ReadStream, W: WriteStream> HttpRequest for Http1Request<R, W>{
     }
     #[inline]
     fn set_host(&mut self, host: String) {
-        self.set_header(&"Host", &host);
+        self.set_header(&"Host", host);
     }
 
     #[inline]

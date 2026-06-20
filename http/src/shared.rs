@@ -1,4 +1,4 @@
-use std::{fmt::Display, collections::HashMap, pin::Pin};
+use std::{borrow::{Borrow, Cow}, collections::HashMap, fmt::Display, ops::Deref, pin::Pin};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -294,8 +294,8 @@ pub trait HttpSocket{
     fn read_until_complete<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a;
     fn read_until_head_complete<'_a>(&'_a mut self) -> impl Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a;
 
-    fn add_header(&mut self, header: &str, value: &str);
-    fn set_header(&mut self, header: &str, value: &str);
+    fn add_header(&mut self, header: &str, value: String);
+    fn set_header(&mut self, header: &str, value: String);
     fn del_header(&mut self, header: &str) -> Option<Vec<String>>;
     
     fn set_status(&mut self, code: u16, message: String);
@@ -311,8 +311,8 @@ pub trait HttpSocketDyn{
     fn read_until_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a>>;
     fn read_until_head_complete<'_a>(&'_a mut self) -> Pin<Box<dyn Future<Output = Result<&'_a HttpClient, LibError>> + Send + '_a>>;
 
-    fn add_header(&mut self, header: &str, value: &str);
-    fn set_header(&mut self, header: &str, value: &str);
+    fn add_header(&mut self, header: &str, value: String);
+    fn set_header(&mut self, header: &str, value: String);
     fn del_header(&mut self, header: &str) -> Option<Vec<String>>;
     
     fn set_status(&mut self, code: u16, message: String);
@@ -338,10 +338,10 @@ impl<H: HttpSocket> HttpSocketDyn for H {
         Box::pin(HttpSocket::read_until_head_complete(self))
     }
 
-    fn add_header(&mut self, header: &str, value: &str) {
+    fn add_header(&mut self, header: &str, value: String) {
         HttpSocket::add_header(self, header, value)
     }
-    fn set_header(&mut self, header: &str, value: &str) {
+    fn set_header(&mut self, header: &str, value: String) {
         HttpSocket::set_header(self, header, value)
     }
     fn del_header(&mut self, header: &str) -> Option<Vec<String>> {
@@ -440,8 +440,8 @@ impl HttpResponse{
 pub trait HttpRequest{
     fn get_type(&self) -> HttpType;
 
-    fn add_header(&mut self, header: &str, value: &str);
-    fn set_header(&mut self, header: &str, value: &str);
+    fn add_header(&mut self, header: &str, value: String);
+    fn set_header(&mut self, header: &str, value: String);
     fn del_header(&mut self, header: &str) -> Option<Vec<String>>;
     
     fn set_method(&mut self, method: HttpMethod);
@@ -461,8 +461,8 @@ pub trait HttpRequest{
 pub trait HttpRequestDyn{
     fn get_type(&self) -> HttpType;
 
-    fn add_header(&mut self, header: &str, value: &str);
-    fn set_header(&mut self, header: &str, value: &str);
+    fn add_header(&mut self, header: &str, value: String);
+    fn set_header(&mut self, header: &str, value: String);
     fn del_header(&mut self, header: &str) -> Option<Vec<String>>;
     
     fn set_method(&mut self, method: HttpMethod);
@@ -484,10 +484,10 @@ impl<H: HttpRequest> HttpRequestDyn for H {
         HttpRequest::get_type(self)
     }
 
-    fn add_header(&mut self, header: &str, value: &str) {
+    fn add_header(&mut self, header: &str, value: String) {
         HttpRequest::add_header(self, header, value)
     }
-    fn set_header(&mut self, header: &str, value: &str) {
+    fn set_header(&mut self, header: &str, value: String) {
         HttpRequest::set_header(self, header, value)
     }
     fn del_header(&mut self, header: &str) -> Option<Vec<String>> {
@@ -649,3 +649,88 @@ pub(crate) fn string_from_owned_utf8(vec: Vec<u8>) -> String {
         }
     }
 }
+
+#[derive(Debug)]
+pub enum ByteSource<'a, const L: usize> {
+    Heap(Vec<u8>),
+    Slice(&'a [u8]),
+    Stack([u8; L]),
+}
+impl<'a, const L: usize> ByteSource<'a, L> {
+    pub const fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::Heap(vec) => vec.as_slice(),
+            Self::Slice(slice) => *slice,
+            Self::Stack(arr) => arr,
+        }
+    }
+    pub fn to_owned(&self) -> ByteSource<'static, L> {
+        match self {
+            Self::Heap(vec) => ByteSource::Heap(vec.clone()),
+            Self::Slice(buf) => ByteSource::Heap(buf.to_vec()),
+            Self::Stack(arr) => ByteSource::Heap(arr.to_vec()),
+        }
+    }
+    pub fn into_owned(self) -> ByteSource<'static, L> {
+        match self {
+            Self::Heap(vec) => ByteSource::Heap(vec),
+            Self::Slice(buf) => ByteSource::Heap(buf.to_vec()),
+            Self::Stack(arr) => ByteSource::Stack(arr),
+        }
+    }
+    pub const fn subslice(&self, start: usize, end: usize) -> &[u8] {
+        #[cfg(debug_assertions)] if start > end { panic!("start cannot be bigger than end") }
+        let buf = self.as_ref();
+        let (_, tail) = buf.split_at(start);
+        tail.split_at(end - start).0
+    }
+}
+impl<'a, const L: usize> AsRef<[u8]> for ByteSource<'a, L> {
+    fn as_ref(&self) -> &[u8] {
+        self.as_ref()
+    }
+}
+impl<'a, const L: usize> Deref for ByteSource<'a, L> {
+    type Target = [u8];
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+impl<'a, const L: usize> Borrow<[u8]> for ByteSource<'a, L> {
+    fn borrow(&self) -> &[u8] {
+        self.as_ref()
+    }
+}
+impl From<Vec<u8>> for ByteSource<'static, 0> {
+    fn from(value: Vec<u8>) -> Self {
+        Self::Heap(value)
+    }
+}
+impl<'a> From<&'a [u8]> for ByteSource<'a, 0> {
+    fn from(value: &'a [u8]) -> Self {
+        Self::Slice(value)
+    }
+}
+impl<const L: usize> From<[u8; L]> for ByteSource<'static, L> {
+    fn from(value: [u8; L]) -> Self {
+        Self::Stack(value)
+    }
+}
+impl<'a> From<Cow<'a, [u8]>> for ByteSource<'a, 0> {
+    fn from(value: Cow<'a, [u8]>) -> Self {
+        match value {
+            Cow::Borrowed(bor) => ByteSource::Slice(bor),
+            Cow::Owned(vec) => ByteSource::Heap(vec),
+        }
+    }
+}
+impl<'a, const L: usize> Clone for ByteSource<'a, L> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Heap(vec) => ByteSource::Heap(vec.clone()),
+            Self::Slice(buf) => ByteSource::Heap(buf.to_vec()),
+            Self::Stack(arr) => ByteSource::Heap(arr.to_vec()),
+        }
+    }
+}
+

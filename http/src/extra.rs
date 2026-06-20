@@ -40,13 +40,13 @@ impl<R: ReadStream, W: WriteStream> HttpSocket for PolyHttpSocket<R, W>{
         }
     }
 
-    fn add_header(&mut self, header: &str, value: &str) { 
+    fn add_header(&mut self, header: &str, value: String) { 
         match self {
             Self::Http1(h) => h.add_header(header, value),
             Self::Http2(h) => h.add_header(&header.to_lowercase(), value),
         }
     }
-    fn set_header(&mut self, header: &str, value: &str){ 
+    fn set_header(&mut self, header: &str, value: String){ 
         match self {
             Self::Http1(h) => h.set_header(header, value),
             Self::Http2(h) => h.set_header(&header.to_lowercase(), value),
@@ -108,13 +108,13 @@ impl<R: ReadStream, W: WriteStream> HttpRequest for PolyHttpRequest<R, W>{
         }
     }
 
-    fn add_header(&mut self, header: &str, value: &str) { 
+    fn add_header(&mut self, header: &str, value: String) { 
         match self {
             Self::Http1(h) => h.add_header(header, value),
             Self::Http2(h) => h.add_header(&header.to_lowercase(), value),
         }
     }
-    fn set_header(&mut self, header: &str, value: &str){ 
+    fn set_header(&mut self, header: &str, value: String){ 
         match self {
             Self::Http1(h) => h.set_header(header, value),
             Self::Http2(h) => h.set_header(&header.to_lowercase(), value),

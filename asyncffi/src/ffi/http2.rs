@@ -1,5 +1,5 @@
 use core::slice;
-use std::{borrow::Cow, ptr, sync::Arc};
+use std::{ffi::c_void, ptr, sync::Arc};
 
 use http::{http2::{client::Http2Request, core::{Http2Frame, Http2Settings}, server::Http2Socket, session::{Http2Session, Mode}}};
 use httprs_core::ffi::{futures::FfiFuture, slice::{FfiSlice, ToFfiSlice}};
@@ -127,7 +127,7 @@ pub extern "C" fn http2_handle_raw(fut: *const FfiFuture, session: *const DynH2S
     unsafe {
         let sess = &*session;
         let fut = &*fut;
-        let frame = Http2Frame::from(if frame.owned { Cow::Owned(frame.to_vec().unwrap()) } else { Cow::Borrowed(frame.as_bytes_static()) });
+        let frame = if frame.owned { Http2Frame::from_owned(frame.to_vec().unwrap()) } else { Http2Frame::from_borrow(frame.as_bytes_static()) };
         let frame = if let Some(frame) = frame { frame } else { return };
 
         spawn_task_with(fut, async move{
@@ -258,7 +258,7 @@ pub extern "C" fn http2_send_settings_maximum(fut: *const FfiFuture, session: *c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_push_promise(fut: *const FfiFuture, session: *const DynH2Sess, associate_id: u32, promise_id: u32, headers: *const FfiHeaderPair, length: usize) {
+pub extern "C" fn http2_send_push_promise(fut: *const FfiFuture<c_void>, session: *const DynH2Sess, associate_id: u32, promise_id: u32, headers: *const FfiHeaderPair, length: usize) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -276,7 +276,7 @@ pub extern "C" fn http2_send_push_promise(fut: *const FfiFuture, session: *const
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_ping(fut: *const FfiFuture, session: *const DynH2Sess, ack: bool, buf: FfiSlice) {
+pub extern "C" fn http2_send_ping(fut: *const FfiFuture<c_void>, session: *const DynH2Sess, ack: bool, buf: FfiSlice) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -289,7 +289,7 @@ pub extern "C" fn http2_send_ping(fut: *const FfiFuture, session: *const DynH2Se
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_goaway(fut: *const FfiFuture, session: *const DynH2Sess, stream_id: u32, code: u32, buf: FfiSlice) {
+pub extern "C" fn http2_send_goaway(fut: *const FfiFuture<c_void>, session: *const DynH2Sess, stream_id: u32, code: u32, buf: FfiSlice) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;

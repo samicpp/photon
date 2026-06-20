@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use std::io;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as b64std;
 use sha1::{Digest, Sha1};
@@ -170,12 +169,12 @@ impl<R: ReadStream, W: WriteStream> Http1Socket<R, W>{
         Ok(&self.client)
     }
 
-    pub fn add_header(&mut self, header: &str, value: &str) {
-        if let Some(hs) = self.headers.get_mut(header) { hs.push(value.to_owned()); }
-        else { self.headers.insert(header.to_owned(), vec![ value.to_owned() ]); }
+    pub fn add_header(&mut self, header: &str, value: String) {
+        if let Some(hs) = self.headers.get_mut(header) { hs.push(value); }
+        else { self.headers.insert(header.to_owned(), vec![ value ]); }
     }
-    pub fn set_header(&mut self, header: &str, value: &str){
-        self.headers.insert(header.to_owned(), vec![ value.to_owned() ]);
+    pub fn set_header(&mut self, header: &str, value: String){
+        self.headers.insert(header.to_owned(), vec![ value ]);
     }
     pub fn del_header(&mut self, header: &str) -> Option<Vec<String>>{
         self.headers.remove(header)
@@ -270,16 +269,16 @@ impl<R: ReadStream, W: WriteStream> Http1Socket<R, W>{
 
         self.code = 101;
         self.status = "Switching Protocols".to_owned();
-        self.set_header("Connection", "Upgrade");
-        self.set_header("Upgrade", "websocket");
-        self.set_header("Sec-WebSocket-Accept", &reskey);
+        self.set_header("Connection", "Upgrade".into());
+        self.set_header("Upgrade", "websocket".into());
+        self.set_header("Sec-WebSocket-Accept", reskey);
         self.close(b"").await?;
 
         Ok(self.websocket_direct())
     }
     pub async fn websocket(self) -> LibResult<WebSocket<BufReader<R>, W>> {
         let key = self.client.headers.get("sec-websocket-key").map_or_else(
-            || Err(io::Error::new(io::ErrorKind::Other, "missing ws key")), 
+            || Err(LibError::InvalidUpgrade), 
             |k| Ok(k[0].as_bytes().to_vec())
         )?;
         self.websocket_with_key(key).await
@@ -311,13 +310,13 @@ impl<R: ReadStream, W: WriteStream> Http1Socket<R, W>{
         self.status = "Switching Protocols".to_owned();
         
         if let Some(settings) = settings {
-            self.set_header("Connection", "Upgrade, HTTP2-Settings");
-            self.set_header("Upgrade", "h2c");
-            self.set_header("HTTP2-Settings", &b64std.encode(settings.to_vec()));
+            self.set_header("Connection", "Upgrade, HTTP2-Settings".into());
+            self.set_header("Upgrade", "h2c".into());
+            self.set_header("HTTP2-Settings", b64std.encode(settings.to_vec()));
         }
         else {
-            self.set_header("Upgrade", "h2c");
-            self.set_header("Connection", "Upgrade");
+            self.set_header("Upgrade", "h2c".into());
+            self.set_header("Connection", "Upgrade".into());
         }
         
         self.close(b"").await?;
@@ -380,8 +379,8 @@ impl<R: ReadStream, W: WriteStream> HttpSocket for Http1Socket<R, W>{
         self.read_until_head_complete()
     }
 
-    #[inline] fn add_header(&mut self, header: &str, value: &str) { self.add_header(header, value) }
-    #[inline] fn set_header(&mut self, header: &str, value: &str){ self.set_header(header, value) }
+    #[inline] fn add_header(&mut self, header: &str, value: String) { self.add_header(header, value) }
+    #[inline] fn set_header(&mut self, header: &str, value: String){ self.set_header(header, value) }
     #[inline] fn del_header(&mut self, header: &str) -> Option<Vec<String>>{ self.del_header(header) }
 
     #[inline]
