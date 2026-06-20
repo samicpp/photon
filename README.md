@@ -2,7 +2,7 @@
 my own ffi http library 
 
 ## Bindings
-The bindings are in a seperate repo [samicpp/httplib-bindings](https://github.com/samicpp/httplib-bindings)
+The FFI bindings are in a seperate repo [samicpp/httplib-bindings](https://github.com/samicpp/httplib-bindings)
 
 ## Crate features
 | feature      | requires | desciption                       |
@@ -48,6 +48,8 @@ The bindings are in a seperate repo [samicpp/httplib-bindings](https://github.co
 - [ ] add type in `FfiFuture<T>` in asyncffi ffi definitions
 - [ ] add header size limit for received connections to prevent attacks
 - [ ] implement `Serialize` and `Deserialize` for HttpClient and HttpResponse
+- [ ] allow changing max client header size and time to prevent blowup attacks
+- [ ] allow setting protocol correctness enforcement
 
 ## Examples
 
