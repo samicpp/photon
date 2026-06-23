@@ -49,6 +49,8 @@ The FFI bindings are in a seperate repo [samicpp/httplib-bindings](https://githu
 - [ ] add builtin content compressions (gzip, deflate, brotli, zstd)
 - [ ] add header size limit for reading connections to prevent attacks
 - [ ] allow setting protocol correctness enforcement
+- [ ] add example code
+
 ## Examples
 
 HTTP/1.1 server
