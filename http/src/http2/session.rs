@@ -612,6 +612,22 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
     }
 
     pub async fn send_headers(&self, stream_id: u32, end: bool, headers: &[(&[u8], &[u8])]) -> LibResult<()> {
+        let mut hpacke = self.encoder.lock().await;
+        let enc = {
+            let mut buff = Vec::new();
+    
+            for &(nam, val) in headers {
+                hpacke.encode(&mut buff, HeaderType::NotIndexed, nam, val, None)?;
+            }
+    
+            buff
+        };
+        self.send_headers_raw(stream_id, end, &enc).await?;
+        drop(hpacke);
+
+        Ok(())
+    }
+    pub async fn send_headers_raw(&self, stream_id: u32, end: bool, headers: &[u8]) -> LibResult<()> {
         {
             let mut shard = 
             match self.streams.get_mut(&stream_id) {
@@ -635,46 +651,35 @@ impl<R: ReadStream, W: WriteStream> Http2Session<R, W> {
             shard.self_end_body = end;
         }
 
-        let mut hpacke = self.encoder.lock().await;
-        let enc = {
-            let mut buff = Vec::new();
-
-            for &(nam, val) in headers {
-                hpacke.encode(&mut buff, HeaderType::NotIndexed, nam, val, None)?;
-            }
-
-            buff
-        };
         let mfs = self.settings.lock().unwrap().max_frame_size.unwrap_or(16384) as usize;
         
         let mut pos = 0;
-        let mut buff = Vec::with_capacity(9 + enc.len() / mfs * 9 + enc.len());
+        let mut buff = Vec::with_capacity(9 + headers.len() / mfs * 9 + headers.len());
 
         
-        if enc.len() < mfs {
-            buff.append(&mut Http2Frame::create_heap(Http2FrameType::Headers, if end { 5 } else { 4 }, stream_id, None, Some(&enc), None)?);
+        if headers.len() < mfs {
+            buff.append(&mut Http2Frame::create_heap(Http2FrameType::Headers, if end { 5 } else { 4 }, stream_id, None, Some(&headers), None)?);
         }
         else {
-            buff.append(&mut Http2Frame::create_heap(Http2FrameType::Headers, 0, stream_id, None, Some(&enc[pos..pos + mfs]), None)?);
+            buff.append(&mut Http2Frame::create_heap(Http2FrameType::Headers, 0, stream_id, None, Some(&headers[pos..pos + mfs]), None)?);
             pos += mfs;
 
-            let mut chunks = enc.len() / mfs;
+            let mut chunks = headers.len() / mfs;
 
-            if enc.len() % mfs == 0 {
+            if headers.len() % mfs == 0 {
                 chunks -= 1;
                 // rem += mfs;
             }
 
             for _ in 0..chunks {
-                buff.append(&mut Http2Frame::create_heap(Http2FrameType::Continuation, 0, stream_id, None, Some(&enc[pos..pos + mfs]), None)?);
+                buff.append(&mut Http2Frame::create_heap(Http2FrameType::Continuation, 0, stream_id, None, Some(&headers[pos..pos + mfs]), None)?);
                 pos += mfs;
             }
 
-            buff.append(&mut Http2Frame::create_heap(Http2FrameType::Continuation, if end { 5 } else { 4 }, stream_id, None, Some(&enc[pos..]), None)?);
+            buff.append(&mut Http2Frame::create_heap(Http2FrameType::Continuation, if end { 5 } else { 4 }, stream_id, None, Some(&headers[pos..]), None)?);
         }
 
         self.netw.lock().await.write_all(&buff).await?;
-        drop(hpacke);
 
         Ok(())
     }

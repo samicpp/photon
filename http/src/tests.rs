@@ -2,7 +2,7 @@
 
 use std::sync::atomic::Ordering;
 
-use crate::{http1::{client::Http1Request, server::Http1Socket}, http2::{core::{Http2Frame, Http2FrameType, Http2Settings}, hpack::{Biterator, HeaderType, decoder::Decoder, encoder::Encoder}, session::Http2Session}, websocket::core::WebSocketFrame};
+use crate::{http1::{client::Http1Request, server::Http1Socket}, http2::{core::{Http2Frame, Http2FrameType, Http2Settings}, hpack::{Biterator, HeaderType, decoder::Decoder, encoder::Encoder}, session::Http2Session}, shared::ByteSource, websocket::core::WebSocketFrame};
 
 #[test]
 fn two_is_two(){
@@ -79,7 +79,7 @@ async fn websocket(){
     let mut server = Http1Socket::new(server, 8 * 1024);
 
     let f0 = tokio::spawn(async move {
-        client.set_header("Host", "localhost");
+        client.set_header("Host", "localhost".into());
         client.path = "/test".to_owned();
         let cws = client.websocket_strict().await.unwrap();
 
@@ -228,7 +228,7 @@ fn http2_frame() {
         0x68, 0x69,
     ];
     
-    let frame = Http2Frame::from(std::borrow::Cow::Borrowed(&frame_raw)).unwrap();
+    let frame = Http2Frame::from(ByteSource::Stack(frame_raw)).unwrap();
     let frame_buff = Http2Frame::create(frame.ftype, frame.flags, frame.stream_id, Some(frame.get_priority()), Some(frame.get_payload()), Some(frame.get_padding()));
 
     assert_eq!(frame.is_end_headers(), false);
