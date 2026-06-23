@@ -293,7 +293,7 @@ impl<R: ReadStream, W: WriteStream> Http1Socket<R, W>{
             self.netr.read_exact(&mut fin).await?;
 
             if &fin == b"SM\r\n\r\n" {
-                Ok(self.http2_direct(Http2Settings::default_no_push()))
+                Ok(self.http2_direct(Http2Settings::DEFAULT_NO_PUSH))
             }
             else {
                 Err(LibError::InvalidUpgrade)
@@ -327,7 +327,7 @@ impl<R: ReadStream, W: WriteStream> Http1Socket<R, W>{
             Http2Settings::from(&buff)
         }
         else {
-            Http2Settings::default_no_push()
+            Http2Settings::DEFAULT_NO_PUSH
         };
 
         let client = self.client;

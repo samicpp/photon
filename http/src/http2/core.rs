@@ -324,47 +324,40 @@ pub struct Http2Settings {
     pub max_header_list_size: Option<u32>,    // 6
 }
 impl Http2Settings {
-    pub const fn empty() -> Self {
-        Self {
-            header_table_size: None,
-            enable_push: None,
-            max_concurrent_streams: None,
-            initial_window_size: None,
-            max_frame_size: None,
-            max_header_list_size: None,
-        }
-    }
-    pub const fn default() -> Self {
-        Self {
-            header_table_size: Some(4096),
-            enable_push: Some(1),
-            max_concurrent_streams: None,
-            initial_window_size: Some(65535),
-            max_frame_size: Some(65535),
-            max_header_list_size: None,
-        }
-    }
-    pub const fn default_no_push() -> Self {
-        Self {
-            header_table_size: Some(4096),
-            enable_push: None,
-            max_concurrent_streams: None,
-            initial_window_size: Some(65535),
-            max_frame_size: Some(65535),
-            max_header_list_size: None,
-        }
-    }
-    pub const fn maximum() -> Self {
-        Self {
-            // unsigned, to be safe
-            header_table_size: Some(2147483647),
-            enable_push: None,
-            max_concurrent_streams: Some(2147483647),
-            initial_window_size: Some(2147483647),
-            max_frame_size: Some(16777215),
-            max_header_list_size: None,
-        }
-    }
+    pub const EMPTY: Self = Self {
+        header_table_size: None,
+        enable_push: None,
+        max_concurrent_streams: None,
+        initial_window_size: None,
+        max_frame_size: None,
+        max_header_list_size: None,
+    };
+
+    pub const DEFAULT: Self = Self {
+        header_table_size: Some(4096),
+        enable_push: Some(1),
+        max_concurrent_streams: None,
+        initial_window_size: Some(65535),
+        max_frame_size: Some(16384),
+        max_header_list_size: None,
+    };
+    pub const DEFAULT_NO_PUSH: Self = Self {
+        header_table_size: Some(4096),
+        enable_push: None,
+        max_concurrent_streams: None,
+        initial_window_size: Some(65535),
+        max_frame_size: Some(16384),
+        max_header_list_size: None,
+    };
+    pub const MAXIMUM: Self = Self {
+        // unsigned, to be safe
+        header_table_size: Some(2147483647),
+        enable_push: None,
+        max_concurrent_streams: Some(2147483647),
+        initial_window_size: Some(2147483647),
+        max_frame_size: Some(16777215),
+        max_header_list_size: None,
+    };
 
     pub fn raw_from(buf: &[u8]) -> Option<Vec<(u16, u32)>> {
         if buf.len() % 6 != 0 { return None }
@@ -381,7 +374,7 @@ impl Http2Settings {
         Some(total)
     }
     pub fn from(buf: &[u8]) -> Self {
-        let mut sett = Self::empty();
+        let mut sett = Self::EMPTY;
         let rset = Self::raw_from(buf);
 
         if let Some(rset) = rset {
@@ -414,6 +407,6 @@ impl Http2Settings {
 impl Default for Http2Settings {
     #[inline]
     fn default() -> Self {
-        Self::default()
+        Self::DEFAULT
     }
 }

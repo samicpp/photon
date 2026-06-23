@@ -660,7 +660,7 @@ impl<'a, const L: usize> ByteSource<'a, L> {
     pub const fn as_ref(&self) -> &[u8] {
         match self {
             Self::Heap(vec) => vec.as_slice(),
-            Self::Slice(slice) => *slice,
+            Self::Slice(buf) => *buf,
             Self::Stack(arr) => arr,
         }
     }
@@ -683,6 +683,13 @@ impl<'a, const L: usize> ByteSource<'a, L> {
         let buf = self.as_ref();
         let (_, tail) = buf.split_at(start);
         tail.split_at(end - start).0
+    }
+    pub const fn len(&self) -> usize {
+        match self {
+            Self::Heap(vec) => vec.len(),
+            Self::Slice(buf) => buf.len(),
+            Self::Stack(_arr) => L,
+        }
     }
 }
 impl<'a, const L: usize> AsRef<[u8]> for ByteSource<'a, L> {

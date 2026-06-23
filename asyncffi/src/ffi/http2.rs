@@ -235,7 +235,7 @@ pub extern "C" fn http2_send_settings_default_no_push(fut: *const FfiFuture, ses
     unsafe {
         let sess = &*session;
         let fut = &*fut;
-        let settings = Http2Settings::default_no_push();
+        let settings = Http2Settings::DEFAULT_NO_PUSH;
 
         spawn_task_with(fut, async move{
             sess.send_settings(settings).await?;
@@ -248,7 +248,7 @@ pub extern "C" fn http2_send_settings_maximum(fut: *const FfiFuture, session: *c
     unsafe {
         let sess = &*session;
         let fut = &*fut;
-        let settings = Http2Settings::maximum();
+        let settings = Http2Settings::MAXIMUM;
 
         spawn_task_with(fut, async move{
             sess.send_settings(settings).await?;

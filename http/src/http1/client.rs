@@ -309,7 +309,7 @@ impl<R: ReadStream, W: WriteStream> Http1Request<R, W>{
         if self.sent_head { return Err(LibError::HeadersSent); }
         
         self.netw.write_all(PREFACE).await?;
-        Ok(self.http2_direct(Http2Settings::default_no_push()))
+        Ok(self.http2_direct(Http2Settings::DEFAULT_NO_PUSH))
     }
     pub async fn h2c_upgrade(&mut self, settings: Option<Http2Settings>, body: &[u8]) -> LibResult<()> {
         // connection can still be answered normally
@@ -341,7 +341,7 @@ impl<R: ReadStream, W: WriteStream> Http1Request<R, W>{
                 Http2Settings::from(&buff)
             }
             else {
-                Http2Settings::default_no_push()
+                Http2Settings::DEFAULT_NO_PUSH
             };
 
             Ok(self.http2_direct(settings))
