@@ -12,9 +12,9 @@ httprs_core = { path = "../core" }
 http = { path = "../http" }
 # quinn = { version = "=0.11.9", features = ["aws-lc-rs"] }
 tokio = "=1.52.3"
-rustls = { version = "=0.23.40", default-features = false, features = [] }
+rustls = { version = "=0.23.41", default-features = false, features = [] }
 tokio-rustls = "=0.26.4"
-webpki-roots = "=1.0.7"
+webpki-roots = "=1.0.8"
 rand = "=0.10.1"
 dashmap = "=6.2.1"
 # rustls-pki-types = "=1.14.0"
