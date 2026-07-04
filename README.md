@@ -51,6 +51,7 @@ The FFI bindings are in a seperate repo [samicpp/httplib-bindings](https://githu
 - [ ] add header size limit for reading connections to prevent attacks
 - [ ] allow setting protocol correctness enforcement
 - [ ] support no-std
+- [ ] change how headers are stored internally for near zero allocation header storage
 
 ## Examples
 
