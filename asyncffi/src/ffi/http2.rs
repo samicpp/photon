@@ -127,7 +127,7 @@ pub extern "C" fn http2_handle_raw(fut: *const FfiFuture<u32>, session: *const D
     unsafe {
         let sess = &*session;
         let fut = &*fut;
-        let frame = if frame.owned { Http2Frame::from_owned(frame.to_vec().unwrap()) } else { Http2Frame::from_borrow(frame.as_bytes_static()) };
+        let frame = if frame.host_owns() { Http2Frame::from_owned(frame.to_vec().unwrap()) } else { Http2Frame::from_borrow(frame.as_bytes_static()) };
         let frame = if let Some(frame) = frame { frame } else { return };
 
         spawn_task_with(fut, async move{

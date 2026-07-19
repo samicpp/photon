@@ -4,13 +4,17 @@ use std::ptr;
 #[repr(C)]
 #[derive(Debug)]
 pub struct FfiSlice{
-    pub owned: bool,
+    pub owned: u16,
     pub len: usize,
     pub cap: usize,
     pub ptr: *const u8,
 }
 
 impl FfiSlice{
+    #[inline] pub const fn ro_mem(&self) -> bool { self.owned == 0 }
+    #[inline] pub const fn host_owns(&self) -> bool { self.owned == 1 }
+    #[inline] pub const fn is_owned(&self) -> bool { self.owned == 1 }
+
     pub fn from_string(string: String) -> Self{
         let bytes = string.into_bytes();
         let ptr = bytes.as_ptr();
@@ -19,7 +23,7 @@ impl FfiSlice{
         std::mem::forget(bytes);
 
         Self {
-            owned: true,
+            owned: 1,
             len,
             cap,
             ptr,
@@ -32,7 +36,7 @@ impl FfiSlice{
         std::mem::forget(vec);
 
         Self {
-            owned: true,
+            owned: 1,
             len,
             cap,
             ptr,
@@ -43,7 +47,7 @@ impl FfiSlice{
         let len = str_slice.len();
 
         Self {
-            owned: false,
+            owned: 0,
             len,
             ptr,
             cap: len,
@@ -54,7 +58,7 @@ impl FfiSlice{
         let len = slice.len();
 
         Self {
-            owned: false,
+            owned: 0,
             len,
             ptr,
             cap: len,
@@ -62,16 +66,16 @@ impl FfiSlice{
     }
 
     pub const fn empty() -> Self{
-        Self { len: 0, cap: 0, ptr: ptr::null(), owned: false }
+        Self { len: 0, cap: 0, ptr: ptr::null(), owned: 0 }
     }
 
     pub fn free(self) {
-        if self.owned && self.ptr != ptr::null(){
+        if self.host_owns() && self.ptr != ptr::null(){
             drop(self.to_vec());
         }
     }
     pub fn to_string(self) -> Option<String>{
-        if !self.owned {
+        if !self.host_owns() {
             None
         }
         else {
@@ -79,13 +83,13 @@ impl FfiSlice{
         }
     }
     pub fn to_vec(self) -> Option<Vec<u8>>{
-        if !self.owned { None }
+        if !self.host_owns() { None }
         else{
             unsafe { Some(Vec::from_raw_parts(self.ptr as *mut u8, self.len, self.cap)) }
         }
     }
     pub fn to_owned(self) -> Self {
-        if self.owned { self }
+        if self.host_owns() { self }
         else {
             Self::from_vec(self.as_bytes().to_vec())
         }
@@ -146,7 +150,7 @@ impl From<&Vec<u8>> for FfiSlice{
 impl Drop for FfiSlice{
     fn drop(&mut self) {
         unsafe {
-            if self.owned {
+            if self.host_owns() {
                 drop(Vec::from_raw_parts(self.ptr as *mut u8, self.len, self.cap));
             }
         }
