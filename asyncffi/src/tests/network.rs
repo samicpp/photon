@@ -40,7 +40,7 @@ async fn serve_tcp(){
     }
     else if client.method.is_unknown() {
         http.set_status(405, "Method Not Allowed".to_owned());
-        http.set_header("Allow", "GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE");
+        http.set_header("Allow", "GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE".into());
         http.close(b"erm, what are you trying to do?").await.unwrap();
     }
     else if client.version.is_http11() && client.host.is_none(){
@@ -49,7 +49,7 @@ async fn serve_tcp(){
     }
     else {
         http.set_status(200, "OK".to_owned());
-        http.set_header("Content-Type", "text/plain");
+        http.set_header("Content-Type", "text/plain".into());
         http.close(b"everything's alright").await.unwrap();
     }
 }
@@ -74,7 +74,7 @@ async fn request_google(){
     let mut req = Http1Request::new(Box::new(tls), 8 * 1024);
 
     req.set_path("/".to_owned());
-    req.set_header("Host", "www.google.com");
+    req.set_header("Host", "www.google.com".into());
     req.send(b"").await.unwrap();
     let _ = req.read_until_complete().await.unwrap();
     let body = req.response.body;
@@ -288,7 +288,7 @@ async fn http2_test(){
     println!("created session");
 
     assert_eq!(h2.read_preface().await.unwrap(), true);
-    h2.send_settings(Http2Settings::default_no_push()).await.unwrap();
+    h2.send_settings(Http2Settings::DEFAULT_NO_PUSH).await.unwrap();
 
     let opened;
     loop {

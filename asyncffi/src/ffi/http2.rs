@@ -5,7 +5,7 @@ use http::{http2::{client::Http2Request, core::{Http2Frame, Http2Settings}, serv
 use httprs_core::ffi::{futures::FfiFuture, slice::{FfiSlice, ToFfiSlice}};
 use tokio::io::{BufReader, ReadHalf, WriteHalf};
 
-use crate::{DynStream, clients::DynHttpRequest, ffi::{server::FfiHeaderPair, utils::{heap_ptr, heap_void_ptr}}, servers::DynHttpSocket, spawn_task_with};
+use crate::{DynStream, clients::DynHttpRequest, ffi::{server::FfiHeaderPair, utils::{heap_ptr}}, servers::DynHttpSocket, spawn_task_with};
 
 pub type DynH2Sess = Http2Session<BufReader<ReadHalf<DynStream>>, WriteHalf<DynStream>>;
 
@@ -72,18 +72,18 @@ pub extern "C" fn http2_free(session: *const DynH2Sess) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_read_preface(fut: *const FfiFuture, session: *const DynH2Sess) {
+pub extern "C" fn http2_read_preface(fut: *const FfiFuture<bool>, session: *const DynH2Sess) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
 
         spawn_task_with(fut, async move{
-            Ok(heap_void_ptr(sess.read_preface().await?))
+            Ok(heap_ptr(sess.read_preface().await?))
         });
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_preface(fut: *const FfiFuture, session: *const DynH2Sess) {
+pub extern "C" fn http2_send_preface(fut: *const FfiFuture<c_void>, session: *const DynH2Sess) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -95,14 +95,14 @@ pub extern "C" fn http2_send_preface(fut: *const FfiFuture, session: *const DynH
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_next(fut: *const FfiFuture, session: *const DynH2Sess) {
+pub extern "C" fn http2_next(fut: *const FfiFuture<u32>, session: *const DynH2Sess) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
 
         spawn_task_with(fut, async move{
             if let Some(open) = sess.next().await? {
-                Ok(heap_void_ptr(open))
+                Ok(heap_ptr(open))
             }
             else {
                 Ok(ptr::null_mut())
@@ -111,19 +111,19 @@ pub extern "C" fn http2_next(fut: *const FfiFuture, session: *const DynH2Sess) {
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_read_raw(fut: *const FfiFuture, session: *const DynH2Sess) {
+pub extern "C" fn http2_read_raw(fut: *const FfiFuture<FfiSlice>, session: *const DynH2Sess) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
 
         spawn_task_with(fut, async move{
             let frame = sess.read_frame().await?;
-            Ok(heap_void_ptr(frame.source.to_ffi_slice()))
+            Ok(heap_ptr(frame.source.to_ffi_slice()))
         });
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_handle_raw(fut: *const FfiFuture, session: *const DynH2Sess, frame: FfiSlice) {
+pub extern "C" fn http2_handle_raw(fut: *const FfiFuture<u32>, session: *const DynH2Sess, frame: FfiSlice) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -132,7 +132,7 @@ pub extern "C" fn http2_handle_raw(fut: *const FfiFuture, session: *const DynH2S
 
         spawn_task_with(fut, async move{
             if let Some(open) = sess.handle(frame).await? {
-                Ok(heap_void_ptr(open))
+                Ok(heap_ptr(open))
             }
             else {
                 Ok(ptr::null_mut())
@@ -149,7 +149,7 @@ pub extern "C" fn http2_open_stream(session: *const DynH2Sess) -> u32 {
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_data(fut: *const FfiFuture, session: *const DynH2Sess, stream_id: u32, end: bool, buf: FfiSlice) {
+pub extern "C" fn http2_send_data(fut: *const FfiFuture<c_void>, session: *const DynH2Sess, stream_id: u32, end: bool, buf: FfiSlice) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -161,7 +161,7 @@ pub extern "C" fn http2_send_data(fut: *const FfiFuture, session: *const DynH2Se
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_headers(fut: *const FfiFuture, session: *const DynH2Sess, stream_id: u32, end: bool, headers: *const FfiHeaderPair, length: usize) {
+pub extern "C" fn http2_send_headers(fut: *const FfiFuture<c_void>, session: *const DynH2Sess, stream_id: u32, end: bool, headers: *const FfiHeaderPair, length: usize) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -179,7 +179,7 @@ pub extern "C" fn http2_send_headers(fut: *const FfiFuture, session: *const DynH
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_priority(fut: *const FfiFuture, session: *const DynH2Sess, stream_id: u32, dependency: u32, weight: u8) {
+pub extern "C" fn http2_send_priority(fut: *const FfiFuture<c_void>, session: *const DynH2Sess, stream_id: u32, dependency: u32, weight: u8) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -192,7 +192,7 @@ pub extern "C" fn http2_send_priority(fut: *const FfiFuture, session: *const Dyn
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_rst_stream(fut: *const FfiFuture, session: *const DynH2Sess, stream_id: u32, code: u32) {
+pub extern "C" fn http2_send_rst_stream(fut: *const FfiFuture<c_void>, session: *const DynH2Sess, stream_id: u32, code: u32) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -205,7 +205,7 @@ pub extern "C" fn http2_send_rst_stream(fut: *const FfiFuture, session: *const D
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_settings(fut: *const FfiFuture, session: *const DynH2Sess, settings: FfiSlice) {
+pub extern "C" fn http2_send_settings(fut: *const FfiFuture<c_void>, session: *const DynH2Sess, settings: FfiSlice) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -218,7 +218,7 @@ pub extern "C" fn http2_send_settings(fut: *const FfiFuture, session: *const Dyn
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_settings_default(fut: *const FfiFuture, session: *const DynH2Sess) {
+pub extern "C" fn http2_send_settings_default(fut: *const FfiFuture<c_void>, session: *const DynH2Sess) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -231,7 +231,7 @@ pub extern "C" fn http2_send_settings_default(fut: *const FfiFuture, session: *c
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_settings_default_no_push(fut: *const FfiFuture, session: *const DynH2Sess) {
+pub extern "C" fn http2_send_settings_default_no_push(fut: *const FfiFuture<c_void>, session: *const DynH2Sess) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;
@@ -244,7 +244,7 @@ pub extern "C" fn http2_send_settings_default_no_push(fut: *const FfiFuture, ses
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn http2_send_settings_maximum(fut: *const FfiFuture, session: *const DynH2Sess) {
+pub extern "C" fn http2_send_settings_maximum(fut: *const FfiFuture<c_void>, session: *const DynH2Sess) {
     unsafe {
         let sess = &*session;
         let fut = &*fut;

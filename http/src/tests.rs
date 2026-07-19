@@ -229,7 +229,7 @@ fn http2_frame() {
     ];
     
     let frame = Http2Frame::from(ByteSource::Stack(frame_raw)).unwrap();
-    let frame_buff = Http2Frame::create(frame.ftype, frame.flags, frame.stream_id, Some(frame.get_priority()), Some(frame.get_payload()), Some(frame.get_padding()));
+    let frame_buff = Http2Frame::create_heap(frame.ftype, frame.flags, frame.stream_id, Some(frame.get_priority()), Some(frame.get_payload()), Some(frame.get_padding())).unwrap();
 
     assert_eq!(frame.is_end_headers(), false);
     assert_eq!(frame.is_end_stream(), true);

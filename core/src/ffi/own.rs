@@ -118,6 +118,20 @@ pub extern "C" fn ffi_future_reset(fut: *mut FfiFuture) {
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn ffi_future_get_userdata(fut: *const FfiFuture) -> *mut c_void{
+    unsafe {
+        *(*fut).userdata.get()
+    }
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn ffi_future_set_userdata(fut: *const FfiFuture, userdata: *mut c_void) {
+    unsafe {
+        *(*fut).userdata.get() = userdata;
+    }
+}
+
+
 // async_ffi(crate) FfiFuture
 
 #[unsafe(no_mangle)]
