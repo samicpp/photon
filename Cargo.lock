@@ -288,7 +288,7 @@ dependencies = [
 
 [[package]]
 name = "httprs_core"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-ffi",
  "tokio",
