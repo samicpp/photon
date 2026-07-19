@@ -83,25 +83,12 @@ impl<T> FfiFuture<T>{
                 return;
             }
 
-            // println!(
-            //     "complete self={:p} waker_field={:p} value={}",
-            //     self,
-            //     &self.waker,
-            //     (*self.waker.get()).is_some()
-            // );
-            
-
             (*self.result.get()) = result;
 
             if let Some(cb) = &self.callback{
                 cb(*self.userdata.get(), *self.result.get());
             }
 
-            // println!(
-            //     "complete: has_waker={}",
-            //     (*self.waker.get()).is_some()
-            // );
-            
             if let Some(w) = (*self.waker.get()).take(){
                 w.wake();
             }
@@ -133,29 +120,13 @@ impl<T> Future for FfiFuture<T> {
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         unsafe {
             let fut = self.get_mut();
-
-            // println!(
-            //     "poll self={:p} waker_before={}",
-            //     fut,
-            //     (*fut.waker.get()).is_some()
-            // );
-
             *fut.waker.get() = Some(cx.waker().clone());
 
-            // println!(
-            //     "poll self={:p} waker_after={}",
-            //     fut,
-            //     (*fut.waker.get()).is_some()
-            // );
-
-            // println!("poll");
-            // dbg!(
             match fut.state.load(Ordering::Acquire){
                 READY => Poll::Ready(Ok(*fut.result.get())),
                 CANCELED => Poll::Ready(Err(*fut.errno.get())),
                 _ => Poll::Pending,
             }
-            // )
         }
     }
 }
