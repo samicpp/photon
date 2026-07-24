@@ -7,18 +7,18 @@ pub const READY: u8 = 1;
 pub const CANCELED: u8 = 2;
 
 #[derive(Debug)]
-pub struct FfiFuture<T = c_void>{
+pub struct FfiFuture<T = c_void, U = c_void>{
     pub state: AtomicU8,
     pub result: UnsafeCell<*mut T>,
-    pub userdata: UnsafeCell<*mut c_void>,
-    pub callback: Option<extern "C" fn(*mut c_void, *mut T)>,
+    pub userdata: UnsafeCell<*mut U>,
+    pub callback: Option<extern "C" fn(*mut U, *mut T)>,
     pub waker: UnsafeCell<Option<Waker>>,
 
     pub errno: UnsafeCell<i32>,
     pub errmsg: UnsafeCell<FfiSlice>,
 }
 
-impl<T> FfiFuture<T>{
+impl<T, U> FfiFuture<T, U>{
     pub const fn default() -> Self {
         FfiFuture { 
             state: AtomicU8::new(PENDING), 
@@ -30,7 +30,7 @@ impl<T> FfiFuture<T>{
             errmsg: UnsafeCell::new(FfiSlice::empty()),
         }
     }
-    pub const fn new(cb: Option<extern "C" fn(*mut c_void, *mut T)>, userdata: *mut c_void) -> Self{
+    pub const fn new(cb: Option<extern "C" fn(*mut U, *mut T)>, userdata: *mut U) -> Self{
         FfiFuture { 
             state: AtomicU8::new(PENDING), 
             result: UnsafeCell::new(ptr::null_mut()), 
@@ -41,7 +41,7 @@ impl<T> FfiFuture<T>{
             errmsg: UnsafeCell::new(FfiSlice::empty()),
         }
     }
-    pub fn new_boxed(cb: Option<extern "C" fn(*mut c_void, *mut T)>, userdata: *mut c_void) -> Box<Self>{
+    pub fn new_boxed(cb: Option<extern "C" fn(*mut U, *mut T)>, userdata: *mut U) -> Box<Self>{
         Box::new(Self::new(cb, userdata))
     }
 
@@ -114,7 +114,7 @@ impl<T> FfiFuture<T>{
     // }
 }
 
-impl<T> Future for FfiFuture<T> {
+impl<T, U> Future for FfiFuture<T, U> {
     type Output = Result<*mut T, i32>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
@@ -131,5 +131,5 @@ impl<T> Future for FfiFuture<T> {
     }
 }
 
-unsafe impl<T> Sync for FfiFuture<T> {}
-unsafe impl<T> Send for FfiFuture<T> {}
+unsafe impl<T, U> Sync for FfiFuture<T, U> {}
+unsafe impl<T, U> Send for FfiFuture<T, U> {}
