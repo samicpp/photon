@@ -1,4 +1,4 @@
-use std::{ffi::CStr, ptr, sync::Arc};
+use std::{ffi::{CStr, c_char}, ptr, sync::Arc};
 
 use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice};
 use rustls::{ServerConfig, pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject}, sign::CertifiedKey};
@@ -9,7 +9,7 @@ use crate::{DynStream, PROVIDER, ffi::utils::heap_ptr, servers::TlsCertSelector,
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tls_config_single_cert_pem(certs: FfiSlice, key: FfiSlice, alpns: *mut i8) -> *const ServerConfig {
+pub extern "C" fn tls_config_single_cert_pem(certs: FfiSlice, key: FfiSlice, alpns: *const c_char) -> *const ServerConfig {
     let prov = (*PROVIDER).clone();
 
     let certs = CertificateDer::pem_reader_iter(certs.as_bytes()).map(|c| c.and_then(|c| Ok(c.into_owned()))).collect::<Result<Vec<_>, _>>();
@@ -51,7 +51,7 @@ pub extern "C" fn tls_config_sni_builder_with_pem(def_certs: FfiSlice, def_key: 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tls_config_sni_add_pem(sni_build: *const TlsCertSelector, domain: *mut i8, certs: FfiSlice, key: FfiSlice) -> bool {
+pub extern "C" fn tls_config_sni_add_pem(sni_build: *const TlsCertSelector, domain: *const c_char, certs: FfiSlice, key: FfiSlice) -> bool {
     unsafe {
         let domain = CStr::from_ptr(domain).to_string_lossy().to_string();
 
@@ -65,7 +65,7 @@ pub extern "C" fn tls_config_sni_add_pem(sni_build: *const TlsCertSelector, doma
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tls_config_sni_builder_build(sni_build: *const TlsCertSelector, alpns: *mut i8) -> *const ServerConfig {
+pub extern "C" fn tls_config_sni_builder_build(sni_build: *const TlsCertSelector, alpns: *const c_char) -> *const ServerConfig {
     unsafe{
         let sni = Arc::from_raw(sni_build);
         let prov = (*PROVIDER).clone();

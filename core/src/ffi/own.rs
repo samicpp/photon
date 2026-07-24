@@ -1,6 +1,6 @@
 use tokio::runtime::Runtime;
 use crate::ffi::{futures::{self, FfiFuture}, slice::FfiSlice};
-use std::{ffi::{CStr, c_void}, ptr, sync::{OnceLock, atomic::Ordering}};
+use std::{ffi::{CStr, c_char, c_void}, ptr, sync::{OnceLock, atomic::Ordering}};
 
 
 // tokio
@@ -58,7 +58,7 @@ impl Default for TokioSettings {
 #[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_worker_threads(tok: *mut TokioSettings, worker_threads: usize) { unsafe { (*tok).worker_threads = Some(worker_threads); } }
 #[unsafe(no_mangle)] pub extern "C" fn tokio_rt_unset_worker_threads(tok: *mut TokioSettings) { unsafe { (*tok).worker_threads = None; } }
 
-#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_thread_name(tok: *mut TokioSettings, thread_name: *const i8) { unsafe { (*tok).thread_name = Some(CStr::from_ptr(thread_name).to_string_lossy().to_string()); } }
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_thread_name(tok: *mut TokioSettings, thread_name: *const c_char) { unsafe { (*tok).thread_name = Some(CStr::from_ptr(thread_name).to_string_lossy().to_string()); } }
 #[unsafe(no_mangle)] pub extern "C" fn tokio_rt_unset_thread_name(tok: *mut TokioSettings) { unsafe { (*tok).thread_name = None; } }
 
 #[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_event_interval(tok: *mut TokioSettings, event_interval: u32) { unsafe { (*tok).event_interval = Some(event_interval); } }
@@ -273,7 +273,7 @@ pub extern "C" fn add_i64(x: i64, y: i64) -> i64 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn panic_test(message: *const i8) -> ! {
+pub extern "C" fn panic_test(message: *const c_char) {
     if message.is_null() {
         panic!("")
     }

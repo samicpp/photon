@@ -1,4 +1,4 @@
-use std::{ffi::{CStr, c_void}, net::SocketAddr, os::fd::{FromRawFd, RawFd}, ptr};
+use std::{ffi::{CStr, c_char, c_void}, net::SocketAddr, os::fd::{FromRawFd, RawFd}, ptr};
 
 use http::{http1::server::Http1Socket, http2::session::Http2Session, shared::{HttpClient, HttpMethod, HttpSocket, HttpType, HttpVersion}, websocket::socket::WebSocket};
 use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice, own::spawn_task};
@@ -126,7 +126,7 @@ impl FfiClient{
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_server_new(fut: *mut FfiFuture<TcpListener>, string: *mut i8){
+pub extern "C" fn tcp_server_new(fut: *mut FfiFuture<TcpListener>, string: *const c_char){
     unsafe {
         let addr = CStr::from_ptr(string).to_string_lossy().to_string();
         let fut = &*fut;

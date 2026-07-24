@@ -1,4 +1,4 @@
-use std::{ffi::{CStr, c_void}, ptr};
+use std::{ffi::{CStr, c_char, c_void}, ptr};
 
 use http::{http1::client::Http1Request, http2::session::Http2Session, shared::{HttpMethod, HttpRequest, HttpResponse, HttpType}, websocket::socket::WebSocket};
 use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice};
@@ -84,7 +84,7 @@ impl FfiResponse{
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_connect(fut: *mut FfiFuture<DynStream>, addr: *mut i8){
+pub extern "C" fn tcp_connect(fut: *mut FfiFuture<DynStream>, addr: *const c_char){
     unsafe{
         let addr = CStr::from_ptr(addr).to_string_lossy().to_string();
         let fut = &*fut;
@@ -98,7 +98,7 @@ pub extern "C" fn tcp_connect(fut: *mut FfiFuture<DynStream>, addr: *mut i8){
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_tls_connect(fut: *mut FfiFuture<DynStream>, addr: *mut i8, domain: *mut i8, alpns: *mut i8){
+pub extern "C" fn tcp_tls_connect(fut: *mut FfiFuture<DynStream>, addr: *const c_char, domain: *const c_char, alpns: *const c_char){
     unsafe{
         let addr = CStr::from_ptr(addr).to_string_lossy().to_string();
         let domain = CStr::from_ptr(domain).to_string_lossy().to_string();
@@ -115,7 +115,7 @@ pub extern "C" fn tcp_tls_connect(fut: *mut FfiFuture<DynStream>, addr: *mut i8,
     }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn tcp_tls_connect_unverified(fut: *mut FfiFuture<DynStream>, addr: *mut i8, domain: *mut i8, alpns: *mut i8){
+pub extern "C" fn tcp_tls_connect_unverified(fut: *mut FfiFuture<DynStream>, addr: *const c_char, domain: *const c_char, alpns: *const c_char){
     unsafe{
         let addr = CStr::from_ptr(addr).to_string_lossy().to_string();
         let domain = CStr::from_ptr(domain).to_string_lossy().to_string();
