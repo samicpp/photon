@@ -1,15 +1,15 @@
 [package]
 name = "http"
-version = "2.4.5"
+version = "2.4.6"
 edition = "2024"
 
 [dependencies]
 # quinn = { path = "../quinn/quinn" }
 # httprs_core = { path = "../core" }
-tokio = { version = "=1.52.3", features = ["full"] }
-base64 = "=0.22.1"
+tokio = { version = "=1.53.1", features = ["full"] }
+base64 = "=0.23.0"
 sha1 = "=0.11.0"
-rand = "=0.10.1"
+rand = "=0.10.2"
 dashmap = "=6.2.1"
 
 serde = { version = "1.0.228", optional = true}

@@ -4,8 +4,82 @@ use std::{ffi::{CStr, c_void}, ptr, sync::{OnceLock, atomic::Ordering}};
 
 
 // tokio
-
 pub static RT: OnceLock<Runtime> = OnceLock::new();
+
+#[derive(Debug, Clone)]
+pub struct TokioSettings {
+    pub multi_threaded: bool,
+    pub worker_threads: Option<usize>,
+    pub thread_name: Option<String>,
+    pub event_interval: Option<u32>,
+    pub max_io_events_per_tick: Option<usize>,
+    pub global_queue_interval: Option<u32>,
+    pub thread_keep_alive_ns: Option<u64>,
+    pub thread_stack_size: Option<usize>,
+    pub max_blocking_threads: Option<usize>,
+}
+impl TokioSettings {
+    const fn default() -> Self {
+        Self { 
+            multi_threaded: true,
+            worker_threads: None,
+            thread_name: None,
+            event_interval: None,
+            max_io_events_per_tick: None,
+            global_queue_interval: None,
+            thread_keep_alive_ns: None,
+            thread_stack_size: None,
+            max_blocking_threads: None,
+        }
+    }
+    const fn new_unset(multi_threaded: bool) -> Self {
+        Self { 
+            multi_threaded,
+            worker_threads: None,
+            thread_name: None,
+            event_interval: None,
+            max_io_events_per_tick: None,
+            global_queue_interval: None,
+            thread_keep_alive_ns: None,
+            thread_stack_size: None,
+            max_blocking_threads: None,
+        }
+    }
+}
+impl Default for TokioSettings {
+    fn default() -> Self {
+        Self::default()
+    }
+}
+
+
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_builder(multi_threaded: bool) -> *mut TokioSettings { Box::into_raw(Box::new(TokioSettings::new_unset(multi_threaded))) }
+
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_worker_threads(tok: *mut TokioSettings, worker_threads: usize) { unsafe { (*tok).worker_threads = Some(worker_threads); } }
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_unset_worker_threads(tok: *mut TokioSettings) { unsafe { (*tok).worker_threads = None; } }
+
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_thread_name(tok: *mut TokioSettings, thread_name: *const i8) { unsafe { (*tok).thread_name = Some(CStr::from_ptr(thread_name).to_string_lossy().to_string()); } }
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_unset_thread_name(tok: *mut TokioSettings) { unsafe { (*tok).thread_name = None; } }
+
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_event_interval(tok: *mut TokioSettings, event_interval: u32) { unsafe { (*tok).event_interval = Some(event_interval); } }
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_unset_event_interval(tok: *mut TokioSettings) { unsafe { (*tok).event_interval = None; } }
+
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_max_io_events_per_tick(tok: *mut TokioSettings, max_io_events_per_tick: usize) { unsafe { (*tok).max_io_events_per_tick = Some(max_io_events_per_tick); } }
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_unset_max_io_events_per_tick(tok: *mut TokioSettings) { unsafe { (*tok).max_io_events_per_tick = None; } }
+
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_global_queue_interval(tok: *mut TokioSettings, global_queue_interval: u32) { unsafe { (*tok).global_queue_interval = Some(global_queue_interval); } }
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_unset_global_queue_interval(tok: *mut TokioSettings) { unsafe { (*tok).global_queue_interval = None; } }
+
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_thread_keep_alive_ns(tok: *mut TokioSettings, thread_keep_alive_ns: u64) { unsafe { (*tok).thread_keep_alive_ns = Some(thread_keep_alive_ns); } }
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_unset_thread_keep_alive_ns(tok: *mut TokioSettings) { unsafe { (*tok).thread_keep_alive_ns = None; } }
+
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_thread_stack_size(tok: *mut TokioSettings, thread_stack_size: usize) { unsafe { (*tok).thread_stack_size = Some(thread_stack_size); } }
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_unset_thread_stack_size(tok: *mut TokioSettings) { unsafe { (*tok).thread_stack_size = None; } }
+
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_set_max_blocking_threads(tok: *mut TokioSettings, max_blocking_threads: usize) { unsafe { (*tok).max_blocking_threads = Some(max_blocking_threads); } }
+#[unsafe(no_mangle)] pub extern "C" fn tokio_rt_unset_max_blocking_threads(tok: *mut TokioSettings) { unsafe { (*tok).max_blocking_threads = None; } }
+
+
 
 #[unsafe(no_mangle)]
 pub extern "C" fn init_rt() -> bool{
@@ -14,6 +88,51 @@ pub extern "C" fn init_rt() -> bool{
     }
     else{
         false
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn init_rt_with_settings(tok: *mut TokioSettings) -> bool{
+    let tok = unsafe { Box::from_raw(tok) };
+    if tok.multi_threaded {
+        let mut rt = tokio::runtime::Builder::new_multi_thread();
+        
+        rt.enable_all();
+        if let Some(t) = tok.worker_threads { rt.worker_threads(t); }
+        if let Some(n) = tok.thread_name { rt.thread_name(n); }
+        if let Some(e) = tok.event_interval { rt.event_interval(e); }
+        if let Some(m) = tok.max_io_events_per_tick { rt.max_io_events_per_tick(m); }
+        if let Some(g) = tok.global_queue_interval { rt.global_queue_interval(g); }
+        if let Some(d) = tok.thread_keep_alive_ns { rt.thread_keep_alive(std::time::Duration::from_nanos(d)); }
+        if let Some(s) = tok.thread_stack_size { rt.thread_stack_size(s); }
+        if let Some(b) = tok.max_blocking_threads { rt.max_blocking_threads(b); }
+
+        match rt.build() {
+            Ok(rt) => {
+                RT.set(rt).unwrap();
+                true
+            },
+            Err(_) => {
+                false
+            }
+        }
+    }
+    else {
+        let mut rt = tokio::runtime::Builder::new_current_thread();
+        
+        rt.enable_all();
+        if let Some(n) = tok.thread_name { rt.thread_name(n); }
+        if let Some(s) = tok.thread_stack_size { rt.thread_stack_size(s); }
+
+        match rt.build() {
+            Ok(rt) => {
+                RT.set(rt).unwrap();
+                true
+            },
+            Err(_) => {
+                false
+            }
+        }
     }
 }
 

@@ -1,8 +1,8 @@
 [package]
 name = "httprs_core"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2024"
 
 [dependencies]
-tokio = "=1.52.3"
+tokio = "=1.53.1"
 async-ffi = "0.5.0"

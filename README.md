@@ -44,7 +44,7 @@ The FFI bindings are in a seperate repo [samicpp/httplib-bindings](https://githu
 - [x] add type in `FfiFuture<T>` in asyncffi ffi definitions
 - [x] implement `Serialize` and `Deserialize` for HttpClient and HttpResponse
 - [x] add example code
-- [ ] allow configuring tokio runtime
+- [x] allow configuring tokio runtime
 - [ ] ~~rewrite http to use `futures` instead of `tokio`~~
 - [ ] ~~allow compiling with different async runtimes~~
 - [ ] add builtin content compressions (gzip, deflate, brotli, zstd)
