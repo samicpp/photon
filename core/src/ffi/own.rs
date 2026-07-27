@@ -1,10 +1,49 @@
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, task::JoinHandle};
 use crate::ffi::{futures::{self, FfiFuture}, slice::FfiSlice};
-use std::{ffi::{CStr, c_char, c_void}, ptr, sync::{OnceLock, atomic::Ordering}};
+use std::{ffi::{CStr, c_char, c_void}, ptr, sync::{PoisonError, RwLock, RwLockWriteGuard, atomic::Ordering}};
 
 
 // tokio
-pub static RT: OnceLock<Runtime> = OnceLock::new();
+pub struct TokioRT(pub RwLock<Option<Runtime>>);
+pub static RT: TokioRT = TokioRT::new();
+
+impl TokioRT{
+    pub const fn new() -> Self {
+        Self(RwLock::new(None))
+    }
+
+    pub fn spawn<F: Future + Send + 'static>(&self, future: F) -> Option<JoinHandle<F::Output>> 
+    where F::Output: Send + 'static 
+    {
+        match &*self.0.read().ok()? {
+            Some(rt) => Some(rt.spawn(future)),
+            None => None,
+        }
+    }
+
+    pub fn block_on<F: Future>(&self, future: F) -> Option<F::Output> {
+        match &*self.0.read().ok()? {
+            Some(rt) => Some(rt.block_on(future)),
+            None => None,
+        }
+    }
+
+    pub fn isset(&self) -> bool {
+        self.0.read().map(|rt| rt.is_some()).unwrap_or(false)
+    }
+    pub fn set(&self, rt: Runtime) -> Result<(), PoisonError<RwLockWriteGuard<'_, Option<Runtime>>>> {
+        match self.0.write() {
+            Ok(mut rtg) => Ok(*rtg = Some(rt)),
+            Err(e) => Err(e),
+        }
+    }
+    pub fn unset(&self) -> Result<(), PoisonError<RwLockWriteGuard<'_, Option<Runtime>>>> {
+        match self.0.write() {
+            Ok(mut rtg) => Ok(*rtg = None),
+            Err(e) => Err(e),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct TokioSettings {
@@ -138,11 +177,11 @@ pub extern "C" fn init_rt_with_settings(tok: *mut TokioSettings) -> bool{
 
 #[unsafe(no_mangle)]
 pub extern "C" fn has_init() -> bool{
-    RT.get().is_some()
+    RT.isset()
 }
 
 pub fn spawn_task<F: Future<Output = ()> + Send + 'static>(future: F) {
-    RT.get().unwrap().spawn(future);
+    RT.spawn(future);
 }
 
 
@@ -211,9 +250,9 @@ pub extern "C" fn ffi_future_free(fut: *mut FfiFuture) {
 pub extern "C" fn ffi_future_await(fut: *mut FfiFuture) {
     unsafe {
         let rfut = &mut *fut;
-        RT.get().unwrap().block_on(async move {
+        RT.block_on(async move {
             let _ = rfut.await;
-        })
+        });
     }
 }
 
@@ -255,7 +294,7 @@ pub extern "C" fn ffi_future_set_userdata(fut: *const FfiFuture, userdata: *mut 
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rt_spawn_async_ffi_future(fut: async_ffi::FfiFuture<()>) {
-    RT.get().unwrap().spawn(fut);
+    RT.spawn(fut);
 }
 
 // slice
