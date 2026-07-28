@@ -1,7 +1,7 @@
 use std::{ffi::{CStr, c_char, c_void}, ptr};
 
 use http::{http1::client::Http1Request, http2::session::Http2Session, shared::{HttpMethod, HttpRequest, HttpResponse, HttpType}, websocket::socket::WebSocket};
-use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice};
+use httprs_core::{futures::FfiFuture, slice::FfiSlice};
 use tokio::io::{BufReader, ReadHalf, WriteHalf};
 
 use crate::{DynStream, clients::{DynHttpRequest, tcp_connect as ntcpconn, tls_upgrade, tls_upgrade_no_verification}, errno::TYPE_ERR, ffi::{const_enums::methods, server::FfiHeaderPair, utils::heap_ptr}, spawn_task_with};

@@ -1,6 +1,6 @@
 use std::{cell::UnsafeCell, ffi::c_void, ptr, sync::{atomic::{AtomicU8, Ordering}}, task::{Poll, Waker}};
 
-use crate::ffi::slice::FfiSlice;
+use crate::slice::FfiSlice;
 
 pub const PENDING: u8 = 0;
 pub const READY: u8 = 1;
@@ -133,3 +133,4 @@ impl<T, U> Future for FfiFuture<T, U> {
 
 unsafe impl<T, U> Sync for FfiFuture<T, U> {}
 unsafe impl<T, U> Send for FfiFuture<T, U> {}
+

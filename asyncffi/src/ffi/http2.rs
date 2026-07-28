@@ -2,7 +2,7 @@ use core::slice;
 use std::{ffi::c_void, ptr, sync::Arc};
 
 use http::{http2::{client::Http2Request, core::{Http2Frame, Http2Settings}, server::Http2Socket, session::{Http2Session, Mode}}};
-use httprs_core::ffi::{futures::FfiFuture, slice::{FfiSlice, ToFfiSlice}};
+use httprs_core::{futures::FfiFuture, slice::{FfiSlice, ToFfiSlice}};
 use tokio::io::{BufReader, ReadHalf, WriteHalf};
 
 use crate::{DynStream, clients::DynHttpRequest, ffi::{server::FfiHeaderPair, utils::{heap_ptr}}, servers::DynHttpSocket, spawn_task_with};

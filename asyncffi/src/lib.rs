@@ -1,7 +1,7 @@
 use std::{pin::Pin, sync::{Arc, LazyLock}};
 
 use http::shared::{LibError, Stream};
-use httprs_core::ffi::{futures::FfiFuture, own::spawn_task};
+use httprs_core::{futures::FfiFuture, runtime::spawn_task};
 use rustls::crypto::CryptoProvider;
 #[cfg(feature = "unix-sockets")]
 use tokio::net::UnixStream;

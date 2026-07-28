@@ -1,7 +1,7 @@
 use std::{ffi::{CStr, c_char, c_void}, net::SocketAddr, os::fd::{FromRawFd, RawFd}, ptr};
 
 use http::{http1::server::Http1Socket, http2::session::Http2Session, shared::{HttpClient, HttpMethod, HttpSocket, HttpType, HttpVersion}, websocket::socket::WebSocket};
-use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice, own::spawn_task};
+use httprs_core::{futures::FfiFuture, slice::FfiSlice, runtime::spawn_task};
 use tokio::{io::{AsyncWriteExt, BufReader, ReadHalf, WriteHalf}, net::TcpListener};
 
 use crate::{DynStream, errno::{Errno, TYPE_ERR}, ffi::utils::heap_ptr, servers::{DynHttpSocket, detect_prot}, spawn_task_with};

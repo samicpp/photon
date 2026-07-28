@@ -1,6 +1,6 @@
 use std::{ffi::c_void, ptr};
 
-use httprs_core::ffi::{futures::FfiFuture, slice::FfiSlice};
+use httprs_core::{futures::FfiFuture, slice::FfiSlice};
 use tokio::io::{BufReader, ReadHalf, WriteHalf};
 
 use http::{shared::Stream, websocket::{core::WebSocketFrame, socket::WebSocket}};

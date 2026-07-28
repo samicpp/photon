@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 #[cfg(test)]
 
 use std::{sync::Arc, thread, time::Duration, ptr};
-use crate::ffi::futures::{self, FfiFuture};
+use crate::futures::{self, FfiFuture};
 
 #[test]
 fn one_is_one(){
