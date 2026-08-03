@@ -1,7 +1,7 @@
 #[derive(Debug)]
 pub enum Frame {
-    Padding(Padding),
-    Ping(Ping),
+    Padding,
+    Ping,
     Ack(Ack),
     ResetStream(ResetStream),
     StopSending(StopSending),

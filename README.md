@@ -20,18 +20,18 @@ The FFI bindings are in a seperate repo [samicpp/httplib-bindings](https://githu
 - [x] WebSocket
 - [x] HPACK
 - [x] HTTP/2
+- [ ] QUIC
 - [ ] QPACK 
-- [ ] HTTP/3 (first using quinn, later my own)
-- [ ] QUIC (replaces quinn)
+- [ ] HTTP/3
 
 #### Client-Side
 - [x] HTTP/1.1
 - [x] WebSocket
 - [x] HPACK
 - [x] HTTP/2
+- [ ] QUIC
 - [ ] QPACK 
-- [ ] HTTP/3 (first using quinn, later my own)
-- [ ] QUIC (replaces quinn)
+- [ ] HTTP/3
 
 ### Features
 - [x] server support TLS
