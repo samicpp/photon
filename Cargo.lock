@@ -16,7 +16,7 @@ checksum = "f4de21c0feef7e5a556e51af767c953f0501f7f300ba785cc99c47bdc8081a50"
 
 [[package]]
 name = "asyncffi"
-version = "3.5.5"
+version = "3.5.6"
 dependencies = [
  "dashmap",
  "http",
@@ -288,7 +288,7 @@ dependencies = [
 
 [[package]]
 name = "httprs_core"
-version = "0.2.9"
+version = "0.3.0"
 dependencies = [
  "async-ffi",
  "tokio",
