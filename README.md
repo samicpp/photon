@@ -46,13 +46,13 @@ The FFI bindings are in a seperate repo [samicpp/httplib-bindings](https://githu
 - [x] add example code
 - [x] allow configuring tokio runtime
 - [x] allow reconfiguring tokio runtime
-- [ ] add builtin content compressions (gzip, deflate, brotli, zstd)
-- [ ] add size limits in http1.1 handler
+- [ ] optimize http/1.1 and http/2 memory usage and limits
+- [ ] implement support for [http](https://crates.io/crates/http)'s general purpose types
+- [ ] rewrite http to allow multiple types of runtimes instead of just `tokio`
 - [ ] allow setting protocol correctness enforcement
+- [ ] add builtin content compressions (gzip, deflate, brotli, zstd)
 - [ ] support no-std
 - [ ] change how headers are stored internally for near zero allocation header storage
-- [ ] ~~rewrite http to use `futures` instead of `tokio`~~
-- [ ] ~~allow compiling with different async runtimes~~
 
 ## Examples
 

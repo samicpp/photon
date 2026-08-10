@@ -94,23 +94,15 @@ impl TlsCertSelector{
     }
 
     pub fn select_cert(&self, sni: &str) -> Option<Arc<CertifiedKey>> {
-        let sni_lab = sni.split('.').collect::<Vec<&str>>();
-
-        for shard in self.sni_match.iter() {
-            let name_lab = shard.key().split('.').collect::<Vec<&str>>();
-            
-            if name_lab.len() != sni_lab.len() {
-                continue;
-            }
-            
-            if name_lab[0] == "*" && name_lab[1..] == sni_lab[1..] {
-                return Some(shard.value().clone());
-            }
-            else if name_lab == sni_lab {
-                return Some(shard.value().clone());
-            }
+        if let Some(shard) = self.sni_match.get(sni) {
+            Some(shard.value().clone())
         }
-        None
+        else if let Some((_, rest)) = sni.split_once('.') && let Some(shard) = self.sni_match.get(&format!("*.{rest}")) {
+            Some(shard.value().clone())
+        } 
+        else {
+            None
+        }
     }
 }
 impl ResolvesServerCert for TlsCertSelector{
