@@ -10,6 +10,9 @@ will likely make everything use a buffer instead of parsing into struct <br/>
 allow directly feeding decrypted packets <br/>
 allow directly feeding frames <br/>
 
+first actually implement it all, then rewrite to be performant <br/>
+
+
 ### pseudo code
 
 ```rust
