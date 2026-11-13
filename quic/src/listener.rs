@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::net::UdpSocket;
 
-use crate::read_varint;
+use crate::{decode_pn, gen_hp_mask, keys::derive_keys, read_varint};
 
 
 pub struct QuicListener {
@@ -47,20 +47,20 @@ impl QuicListener {
             while pos < len {
 
                 if buff[pos] & 0x80 != 0 { // long header
-                    let mut off = 0;
+                    let mut off = pos;
 
                     let ty = (buff[pos] & 0b0011_0000) >> 4;
                     let pnl = buff[pos] & 0b0000_0011; // unused in vn and retry, obfuscated
                     let version = u32::from_be_bytes([buff[pos + 1], buff[pos + 2], buff[pos + 3], buff[pos + 4]]);
 
-                    off = 5;
+                    off += 5;
                     
-                    let dcidl = buff[pos + off] as usize;
-                    let dcid = &buff[pos + off + 1..pos + off + 1 + dcidl];
-                    let scidl = buff[pos + off + 1 + dcidl] as usize;
-                    let scid = &buff[pos + off + dcidl + 2..pos + off + dcidl + 2 + scidl];
+                    let dcidl = buff[off] as usize;
+                    let dcid = &buff[off + 1..off + 1 + dcidl];
+                    let scidl = buff[off + 1 + dcidl] as usize;
+                    let scid = &buff[off + dcidl + 2..off + dcidl + 2 + scidl];
 
-                    off = pos + off + dcidl + 2 + scidl;
+                    off = off + dcidl + 2 + scidl;
 
                     if version == 0 {
                         // invalid, clients not allowed to send vn
@@ -69,11 +69,35 @@ impl QuicListener {
                     else {
                         match ty {
                             0 => { // initial
+                                let Some(keys) = derive_keys(&dcid) else { continue }; // invalid if None
+                                
                                 let toklen = read_varint(&buff, &mut off) as usize;
-                                let token = &buff[off + toklen];
+                                let token = &buff[off..off + toklen];
                                 off += toklen;
-
+                                
                                 let length = read_varint(&buff, &mut off) as usize;
+                                
+                                let hp_sample = &buff[off + 4..off + 20];
+                                let Ok(hp_mask) = gen_hp_mask(&keys.client_hp, hp_sample) else { continue };
+                                let dpnl = pnl ^ (hp_mask[0] & 0b0000_0011);
+
+                                let pn = match dpnl {
+                                    0 => u32::from_be_bytes([0, 0, 0, buff[pos] ^ hp_mask[1]]),
+                                    1 => u32::from_be_bytes([0, 0, buff[pos] ^ hp_mask[1], buff[pos + 1] ^ hp_mask[2]]),
+                                    2 => u32::from_be_bytes([0, buff[pos] ^ hp_mask[1], buff[pos + 1] ^ hp_mask[2], buff[pos + 2] ^ hp_mask[3]]),
+                                    3 => u32::from_be_bytes([buff[pos] ^ hp_mask[1], buff[pos + 1] ^ hp_mask[2], buff[pos + 2] ^ hp_mask[3], buff[pos + 3] ^ hp_mask[4]]),
+                                    _ => unreachable!("4 bits cant total > 3") // impossible outcome
+                                };
+
+                                let real_pn = decode_pn(0, pn, dpnl + 1);
+
+                                // header and payload decryption
+
+
+                                println!("ty = {ty}, pnl = {pnl}, version = {version}");
+                                // println!("scid = {scid}, dcid = {dcid}");
+                                println!("dpnl = {dpnl}, pn = {pn}, real_pn = {real_pn}");
+                                // dbg!(keys);
 
                                 println!("\x1b[36mInitial\x1b[0m {scid:?} -> {dcid:?}");
 
@@ -90,7 +114,7 @@ impl QuicListener {
                             2 => { // handshake
                                 let length = read_varint(&buff, &mut off) as usize;
 
-                                println!("\x1b[36mZeroRTT\x1b[0m {scid:?} -> {dcid:?}");
+                                println!("\x1b[36mHandsnake\x1b[0m {scid:?} -> {dcid:?}");
 
                                 
                                 pos += off + length; 
@@ -99,7 +123,7 @@ impl QuicListener {
                                 let rettok = &buff[off..len - 16];
                                 let inttag = &buff[len - 16..len];
 
-                                println!("\x1b[36mZeroRTT\x1b[0m {scid:?} -> {dcid:?}");
+                                println!("\x1b[36mRetry\x1b[0m {scid:?} -> {dcid:?}");
 
                                 pos = len;
                             }, 

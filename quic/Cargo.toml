@@ -8,6 +8,10 @@ tokio = { version = "1.52.3", features = ["full"] }
 socket2 = "0.6.4"
 # rustls = { version = "0.23.43", default-features = false, features = [] }
 bytes = "1.12.1"
+hkdf = "0.13.0"
+sha2 = "0.11.0"
+aes = "0.9.4"
+cipher = "0.5.2"
 
 # [features]
 # ring = ["rustls/ring"]

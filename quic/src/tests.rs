@@ -6,7 +6,7 @@ use bytes::BytesMut;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 
-use crate::{listener::QuicListener, read_varint, write_varint};
+use crate::{decode_pn, encode_pn, listener::QuicListener, read_varint, write_varint};
 
 #[test]
 fn three_is_three(){
@@ -37,6 +37,17 @@ fn varints() {
 
     assert_eq!(index2, 16);
     assert_eq!(buf, buf2);
+}
+
+#[test]
+fn pn_numbers() {
+    let full_pn = 20;
+    let enc_pn = encode_pn(full_pn, 0);
+    let dec_pn = decode_pn(0, enc_pn, 1);
+    
+    // println!("full_pn = {full_pn}\nenc_pn = {enc_pn}\ndec_pn = {dec_pn}");
+
+    assert_eq!(full_pn, dec_pn);
 }
 
 #[tokio::test]
