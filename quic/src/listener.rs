@@ -1,6 +1,8 @@
-use std::io;
+// use std::{array::from_ref, io, slice::from_mut};
 
+// use aes_gcm::{Aes128Gcm, Nonce, aead::{Aead, Payload}};
 use bytes::BytesMut;
+// use cipher::KeyInit;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::net::UdpSocket;
 
@@ -33,7 +35,7 @@ impl QuicListener {
     }
 
 
-    pub async fn listen(&self, size: usize) -> io::Result<()> {
+    pub async fn listen(&self, size: usize) -> std::io::Result<()> {
         let mut buff = BytesMut::new();
         buff.resize(size, 0);
 
@@ -82,26 +84,44 @@ impl QuicListener {
                                 let dpnl = pnl ^ (hp_mask[0] & 0b0000_0011);
 
                                 let pn = match dpnl {
-                                    0 => u32::from_be_bytes([0, 0, 0, buff[pos] ^ hp_mask[1]]),
-                                    1 => u32::from_be_bytes([0, 0, buff[pos] ^ hp_mask[1], buff[pos + 1] ^ hp_mask[2]]),
-                                    2 => u32::from_be_bytes([0, buff[pos] ^ hp_mask[1], buff[pos + 1] ^ hp_mask[2], buff[pos + 2] ^ hp_mask[3]]),
-                                    3 => u32::from_be_bytes([buff[pos] ^ hp_mask[1], buff[pos + 1] ^ hp_mask[2], buff[pos + 2] ^ hp_mask[3], buff[pos + 3] ^ hp_mask[4]]),
-                                    _ => unreachable!("4 bits cant total > 3") // impossible outcome
+                                    0 => u32::from_be_bytes([0, 0, 0, buff[off] ^ hp_mask[1]]),
+                                    1 => u32::from_be_bytes([0, 0, buff[off] ^ hp_mask[1], buff[off + 1] ^ hp_mask[2]]),
+                                    2 => u32::from_be_bytes([0, buff[off] ^ hp_mask[1], buff[off + 1] ^ hp_mask[2], buff[off + 2] ^ hp_mask[3]]),
+                                    _ => u32::from_be_bytes([buff[off] ^ hp_mask[1], buff[off + 1] ^ hp_mask[2], buff[off + 2] ^ hp_mask[3], buff[off + 3] ^ hp_mask[4]]),
+                                    // _ => unreachable!("4 bits cant total > 3") // impossible outcome
                                 };
 
                                 let real_pn = decode_pn(0, pn, dpnl + 1);
+                                // off += 1 + dpnl as usize;
 
                                 // header and payload decryption
 
+                                // let mut nonce = [0; 12];
+                                // nonce.copy_from_slice(&keys.client_iv);
+                                // nonce[4..].copy_from_slice(&real_pn.to_be_bytes());
 
-                                println!("ty = {ty}, pnl = {pnl}, version = {version}");
+                                // let key: &cipher::Array<u8, _> = keys.client_key[..].try_into().unwrap(); // aes_gcm::Key::<Aes128Gcm>::from_slice(&keys.client_key);
+                                // let cipher = Aes128Gcm::new(key);
+                                // let nonce: &cipher::Array<u8, _> = nonce.as_ref().try_into().unwrap(); // Nonce::from_slice(&nonce);
+
+                                
+
+                                // let ciphertext = Payload { 
+                                //     msg: &buff[off + dpnl as usize + 1..off + length], 
+                                //     aad: &buff[pos..off + dpnl as usize + 1] 
+                                // };
+                                // let decrypt = cipher.decrypt(nonce, ciphertext).unwrap();
+                                // let string = String::from_utf8_lossy(&decrypt);
+                                // println!("{string}");
+
+                                // println!("ty = {ty}, pnl = {pnl}, version = {version}");
                                 // println!("scid = {scid}, dcid = {dcid}");
-                                println!("dpnl = {dpnl}, pn = {pn}, real_pn = {real_pn}");
+                                // println!("dpnl = {dpnl}, pn = {pn}, real_pn = {real_pn}");
                                 // dbg!(keys);
 
                                 println!("\x1b[36mInitial\x1b[0m {scid:?} -> {dcid:?}");
 
-                                pos += off + length; 
+                                pos = off + length; 
                             },
                             1 => { // 0rtt
                                 let length = read_varint(&buff, &mut off) as usize;
@@ -109,7 +129,7 @@ impl QuicListener {
                                 println!("\x1b[36mZeroRTT\x1b[0m {scid:?} -> {dcid:?}");
 
                                 
-                                pos += off + length; 
+                                pos = off + length; 
                             }, 
                             2 => { // handshake
                                 let length = read_varint(&buff, &mut off) as usize;
@@ -117,7 +137,7 @@ impl QuicListener {
                                 println!("\x1b[36mHandsnake\x1b[0m {scid:?} -> {dcid:?}");
 
                                 
-                                pos += off + length; 
+                                pos = off + length; 
                             }, 
                             3 => { // retry
                                 let rettok = &buff[off..len - 16];
@@ -140,6 +160,6 @@ impl QuicListener {
             }
         }
 
-        Ok(())
+        #[allow(unreachable_code)] Ok(())
     }
 }

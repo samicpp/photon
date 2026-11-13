@@ -48,12 +48,12 @@ pub fn derive_keys(dcid: &[u8]) -> Option<DerivedKeys> {
     let (initial, _extract) = Hkdf::<Sha256>::extract(Some(INITIAL_SALT_V1), dcid);
     
 
-    let client_initial = hkdf_expand_label(&initial, b"tls13 client in", 32)?;
+    let client_initial = hkdf_expand_label(&initial, b"tls13 quic client in", 32)?;
     let client_key = hkdf_expand_label(&client_initial, b"tls13 quic key", 16)?;
     let client_iv = hkdf_expand_label(&client_initial, b"tls13 quic iv", 12)?;
     let client_hp = hkdf_expand_label(&client_initial, b"tls13 quic hp", 16)?;
 
-    let server_initial = hkdf_expand_label(&initial, b"tls13 server in", 32)?;
+    let server_initial = hkdf_expand_label(&initial, b"tls13 quic server in", 32)?;
     let server_key = hkdf_expand_label(&server_initial, b"tls13 quic key", 16)?;
     let server_iv = hkdf_expand_label(&server_initial, b"tls13 quic iv", 12)?;
     let server_hp = hkdf_expand_label(&server_initial, b"tls13 quic hp", 16)?;
