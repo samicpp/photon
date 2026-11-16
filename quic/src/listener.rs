@@ -1,8 +1,6 @@
-// use std::{array::from_ref, io, slice::from_mut};
-
-// use aes_gcm::{Aes128Gcm, Nonce, aead::{Aead, Payload}};
+use aes_gcm::{Aes128Gcm, aead::{Aead, Payload}};
 use bytes::BytesMut;
-// use cipher::KeyInit;
+use cipher::KeyInit;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::net::UdpSocket;
 
@@ -58,9 +56,9 @@ impl QuicListener {
                     off += 5;
                     
                     let dcidl = buff[off] as usize;
-                    let dcid = &buff[off + 1..off + 1 + dcidl];
+                    let dcid = buff[off + 1..off + 1 + dcidl].to_vec();
                     let scidl = buff[off + 1 + dcidl] as usize;
-                    let scid = &buff[off + dcidl + 2..off + dcidl + 2 + scidl];
+                    let scid = buff[off + dcidl + 2..off + dcidl + 2 + scidl].to_vec();
 
                     off = off + dcidl + 2 + scidl;
 
@@ -81,45 +79,54 @@ impl QuicListener {
                                 
                                 let hp_sample = &buff[off + 4..off + 20];
                                 let Ok(hp_mask) = gen_hp_mask(&keys.client_hp, hp_sample) else { continue };
-                                let dpnl = pnl ^ (hp_mask[0] & 0b0000_0011);
+                                buff[pos] ^= hp_mask[0] & 0b0000_1111;
+                                let dpnl = buff[pos] & 0b0000_0011;
+
+                                for i in 0..dpnl as usize + 1 {
+                                    buff[off + i] ^= hp_mask[i + 1];
+                                }
 
                                 let pn = match dpnl {
-                                    0 => u32::from_be_bytes([0, 0, 0, buff[off] ^ hp_mask[1]]),
-                                    1 => u32::from_be_bytes([0, 0, buff[off] ^ hp_mask[1], buff[off + 1] ^ hp_mask[2]]),
-                                    2 => u32::from_be_bytes([0, buff[off] ^ hp_mask[1], buff[off + 1] ^ hp_mask[2], buff[off + 2] ^ hp_mask[3]]),
-                                    _ => u32::from_be_bytes([buff[off] ^ hp_mask[1], buff[off + 1] ^ hp_mask[2], buff[off + 2] ^ hp_mask[3], buff[off + 3] ^ hp_mask[4]]),
+                                    0 => u32::from_be_bytes([0, 0, 0, buff[off]]),
+                                    1 => u32::from_be_bytes([0, 0, buff[off], buff[off + 1]]),
+                                    2 => u32::from_be_bytes([0, buff[off], buff[off + 1], buff[off + 2]]),
+                                    _ => u32::from_be_bytes([buff[off], buff[off + 1], buff[off + 2], buff[off + 3]]),
                                     // _ => unreachable!("4 bits cant total > 3") // impossible outcome
                                 };
 
                                 let real_pn = decode_pn(0, pn, dpnl + 1);
                                 // off += 1 + dpnl as usize;
+                                
+                                println!("\x1b[36mInitial\x1b[0m {dpnl} {real_pn} {scid:?} -> {dcid:?}");
 
                                 // header and payload decryption
 
-                                // let mut nonce = [0; 12];
-                                // nonce.copy_from_slice(&keys.client_iv);
-                                // nonce[4..].copy_from_slice(&real_pn.to_be_bytes());
+                                let mut nonce = [0; 12];
+                                nonce.copy_from_slice(&keys.client_iv);
+                                let pn_be = real_pn.to_be_bytes();
+                                for i in 0..8 {
+                                    nonce[i + 4] ^= pn_be[i];
+                                }
 
-                                // let key: &cipher::Array<u8, _> = keys.client_key[..].try_into().unwrap(); // aes_gcm::Key::<Aes128Gcm>::from_slice(&keys.client_key);
-                                // let cipher = Aes128Gcm::new(key);
-                                // let nonce: &cipher::Array<u8, _> = nonce.as_ref().try_into().unwrap(); // Nonce::from_slice(&nonce);
+                                let key: &cipher::Array<u8, _> = keys.client_key[..].try_into().unwrap(); // aes_gcm::Key::<Aes128Gcm>::from_slice(&keys.client_key);
+                                let cipher = Aes128Gcm::new(key);
+                                let nonce: &cipher::Array<u8, _> = nonce.as_ref().try_into().unwrap(); // Nonce::from_slice(&nonce);
 
                                 
+                                let ciphertext = Payload { 
+                                    aad: &buff[pos..off + 1 + dpnl as usize],
+                                    msg: &buff[off + 1 + dpnl as usize..off + length], 
+                                };
+                                let decrypt = cipher.decrypt(nonce, ciphertext).unwrap();
 
-                                // let ciphertext = Payload { 
-                                //     msg: &buff[off + dpnl as usize + 1..off + length], 
-                                //     aad: &buff[pos..off + dpnl as usize + 1] 
-                                // };
-                                // let decrypt = cipher.decrypt(nonce, ciphertext).unwrap();
-                                // let string = String::from_utf8_lossy(&decrypt);
-                                // println!("{string}");
+                                let string = String::from_utf8_lossy(&decrypt);
+                                println!("{string}");
 
                                 // println!("ty = {ty}, pnl = {pnl}, version = {version}");
                                 // println!("scid = {scid}, dcid = {dcid}");
                                 // println!("dpnl = {dpnl}, pn = {pn}, real_pn = {real_pn}");
                                 // dbg!(keys);
 
-                                println!("\x1b[36mInitial\x1b[0m {scid:?} -> {dcid:?}");
 
                                 pos = off + length; 
                             },

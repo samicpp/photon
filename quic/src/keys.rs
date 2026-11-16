@@ -31,7 +31,7 @@ pub struct DerivedKeys {
 pub fn hkdf_expand_label(secret: &[u8], label: &[u8], out_len: usize) -> Option<Vec<u8>> {
     // label always start with tls13 RFC 8446 7.1
 
-    let mut hkdf_label = Vec::with_capacity(3 + label.len());
+    let mut hkdf_label = Vec::with_capacity(4 + label.len());
     hkdf_label.extend_from_slice(&(out_len as u16).to_be_bytes());
     hkdf_label.push(label.len() as u8);
     hkdf_label.extend_from_slice(label);
@@ -48,12 +48,12 @@ pub fn derive_keys(dcid: &[u8]) -> Option<DerivedKeys> {
     let (initial, _extract) = Hkdf::<Sha256>::extract(Some(INITIAL_SALT_V1), dcid);
     
 
-    let client_initial = hkdf_expand_label(&initial, b"tls13 quic client in", 32)?;
+    let client_initial = hkdf_expand_label(&initial, b"tls13 client in", 32)?;
     let client_key = hkdf_expand_label(&client_initial, b"tls13 quic key", 16)?;
     let client_iv = hkdf_expand_label(&client_initial, b"tls13 quic iv", 12)?;
     let client_hp = hkdf_expand_label(&client_initial, b"tls13 quic hp", 16)?;
 
-    let server_initial = hkdf_expand_label(&initial, b"tls13 quic server in", 32)?;
+    let server_initial = hkdf_expand_label(&initial, b"tls13 server in", 32)?;
     let server_key = hkdf_expand_label(&server_initial, b"tls13 quic key", 16)?;
     let server_iv = hkdf_expand_label(&server_initial, b"tls13 quic iv", 12)?;
     let server_hp = hkdf_expand_label(&server_initial, b"tls13 quic hp", 16)?;
