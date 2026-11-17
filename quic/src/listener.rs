@@ -1,6 +1,6 @@
 use aes_gcm::{Aes128Gcm, aead::{Aead, Payload}};
 use bytes::BytesMut;
-use cipher::KeyInit;
+use cipher::{Array, BlockCipherEncrypt, KeyInit};
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::net::UdpSocket;
 
@@ -78,7 +78,10 @@ impl QuicListener {
                                 let length = read_varint(&buff, &mut off) as usize;
                                 
                                 let hp_sample = &buff[off + 4..off + 20];
-                                let Ok(hp_mask) = gen_hp_mask(&keys.client_hp, hp_sample) else { continue };
+                                
+                                let Ok(mut hp_mask) = Array::try_from(hp_sample) else { continue };
+                                keys.client_hp_cipher.encrypt_block(&mut hp_mask);
+                                
                                 buff[pos] ^= hp_mask[0] & 0b0000_1111;
                                 let dpnl = buff[pos] & 0b0000_0011;
 

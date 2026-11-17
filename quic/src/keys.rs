@@ -1,29 +1,33 @@
+use aes::Aes128;
+use cipher::KeyInit;
 use hkdf::Hkdf;
-use sha2::{Sha256, digest::Output};
+use sha2::Sha256;
 
 pub const INITIAL_SALT_V1: &'static [u8] = &[0x38, 0x76, 0x2c, 0xf7, 0xf5, 0x59, 0x34, 0xb3, 0x4d, 0x17, 0x9a, 0xe6, 0xa4, 0xc8, 0x0c, 0xad, 0xcc, 0xbb, 0x7f, 0x0a];
 
-// pub const CLIENT_IN: &'static [u8] = &[0x00, 0x20, 0x0f, 0x74, 0x6c, 0x73, 0x31, 0x33, 0x20, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x20, 0x69, 0x6e, 0x00];
-// pub const SERVER_IN: &'static [u8] = &[0x00, 0x20, 0x0f, 0x74, 0x6c, 0x73, 0x31, 0x33, 0x20, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x20, 0x69, 0x6e, 0x00];
+pub const CLIENT_IN: &'static [u8] = &[0x00, 0x20, 0x0f, 0x74, 0x6c, 0x73, 0x31, 0x33, 0x20, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x20, 0x69, 0x6e, 0x00];
+pub const SERVER_IN: &'static [u8] = &[0x00, 0x20, 0x0f, 0x74, 0x6c, 0x73, 0x31, 0x33, 0x20, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x20, 0x69, 0x6e, 0x00];
 
-// pub const QUIC_KEY: &'static [u8] = &[0x00, 0x10, 0x0e, 0x74, 0x6c, 0x73, 0x31, 0x33, 0x20, 0x71, 0x75, 0x69, 0x63, 0x20, 0x6b, 0x65, 0x79, 0x00];
-// pub const QUIC_IV: &'static [u8] = &[0x00, 0x0c, 0x0d, 0x74, 0x6c, 0x73, 0x31, 0x33, 0x20, 0x71, 0x75, 0x69, 0x63, 0x20, 0x69, 0x76, 0x00];
-// pub const QUIC_HP: &'static [u8] = &[0x00, 0x10, 0x0d, 0x74, 0x6c, 0x73, 0x31, 0x33, 0x20, 0x71, 0x75, 0x69, 0x63, 0x20, 0x68, 0x70, 0x00];
+pub const QUIC_KEY: &'static [u8] = &[0x00, 0x10, 0x0e, 0x74, 0x6c, 0x73, 0x31, 0x33, 0x20, 0x71, 0x75, 0x69, 0x63, 0x20, 0x6b, 0x65, 0x79, 0x00];
+pub const QUIC_IV: &'static [u8] = &[0x00, 0x0c, 0x0d, 0x74, 0x6c, 0x73, 0x31, 0x33, 0x20, 0x71, 0x75, 0x69, 0x63, 0x20, 0x69, 0x76, 0x00];
+pub const QUIC_HP: &'static [u8] = &[0x00, 0x10, 0x0d, 0x74, 0x6c, 0x73, 0x31, 0x33, 0x20, 0x71, 0x75, 0x69, 0x63, 0x20, 0x68, 0x70, 0x00];
 
 
 #[derive(Debug)]
 pub struct DerivedKeys {
-    pub initial: Output<Sha256>,
+    // pub initial: sha2::digest::Output<Sha256>,
     
-    pub client_initial: Vec<u8>,
-    pub client_key: Vec<u8>,
-    pub client_iv: Vec<u8>,
-    pub client_hp: Vec<u8>,
+    // pub client_initial: [u8; 32],
+    pub client_key: [u8; 16],
+    pub client_iv: [u8; 12],
+    // pub client_hp: [u8; 16],
+    pub client_hp_cipher: Aes128,
 
-    pub server_initial: Vec<u8>,
-    pub server_key: Vec<u8>,
-    pub server_iv: Vec<u8>,
-    pub server_hp: Vec<u8>,
+    // pub server_initial: [u8; 32],
+    pub server_key: [u8; 16],
+    pub server_iv: [u8; 12],
+    // pub server_hp: [u8; 16],
+    pub server_hp_cipher: Aes128,
 }
 
 
@@ -43,21 +47,46 @@ pub fn hkdf_expand_label(secret: &[u8], label: &[u8], out_len: usize) -> Option<
 
     Some(okm)
 }
+pub fn hkdf_expand<const S: usize>(secret: &[u8], hkdf_label: &[u8]) -> Option<[u8; S]> {
+    let hkdf = Hkdf::<Sha256>::from_prk(secret).ok()?;
+    let mut okm = [0; S];
+    hkdf.expand(&hkdf_label, &mut okm).ok()?;
+
+    Some(okm)
+}
 
 pub fn derive_keys(dcid: &[u8]) -> Option<DerivedKeys> {
     let (initial, _extract) = Hkdf::<Sha256>::extract(Some(INITIAL_SALT_V1), dcid);
     
 
-    let client_initial = hkdf_expand_label(&initial, b"tls13 client in", 32)?;
-    let client_key = hkdf_expand_label(&client_initial, b"tls13 quic key", 16)?;
-    let client_iv = hkdf_expand_label(&client_initial, b"tls13 quic iv", 12)?;
-    let client_hp = hkdf_expand_label(&client_initial, b"tls13 quic hp", 16)?;
+    let client_initial = hkdf_expand::<32>(&initial, CLIENT_IN)?;
+    let client_key = hkdf_expand::<16>(&client_initial, QUIC_KEY)?;
+    let client_iv = hkdf_expand::<12>(&client_initial, QUIC_IV)?;
+    let client_hp = hkdf_expand::<16>(&client_initial, QUIC_HP)?;
 
-    let server_initial = hkdf_expand_label(&initial, b"tls13 server in", 32)?;
-    let server_key = hkdf_expand_label(&server_initial, b"tls13 quic key", 16)?;
-    let server_iv = hkdf_expand_label(&server_initial, b"tls13 quic iv", 12)?;
-    let server_hp = hkdf_expand_label(&server_initial, b"tls13 quic hp", 16)?;
+    let server_initial = hkdf_expand::<32>(&initial, SERVER_IN)?;
+    let server_key = hkdf_expand::<16>(&server_initial, QUIC_KEY)?;
+    let server_iv = hkdf_expand::<12>(&server_initial, QUIC_IV)?;
+    let server_hp = hkdf_expand::<16>(&server_initial, QUIC_HP)?;
 
 
-    Some(DerivedKeys { initial, client_initial, client_key, client_iv, client_hp, server_initial, server_key, server_iv, server_hp })
+    let client_hp_cipher = Aes128::new((&client_hp).try_into().ok()?);
+    let server_hp_cipher = Aes128::new((&server_hp).try_into().ok()?);
+
+
+    Some(DerivedKeys { 
+        // initial, 
+
+        // client_initial, 
+        client_key, 
+        client_iv, 
+        // client_hp,
+        client_hp_cipher,
+
+        // server_initial, 
+        server_key, 
+        server_iv, 
+        // server_hp 
+        server_hp_cipher,
+    })
 }

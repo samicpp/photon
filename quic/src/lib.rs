@@ -1,7 +1,7 @@
 use std::array::TryFromSliceError;
 
 use aes::Aes128;
-use cipher::{Array, BlockCipherEncrypt, BlockModeDecrypt, BlockModeEncrypt, KeyInit};
+use cipher::{Array, BlockCipherEncrypt, KeyInit};
 
 // #[cfg(test)]
 pub mod tests;
@@ -218,7 +218,7 @@ pub fn gen_hp_mask(hp_key: &[u8], sample: &[u8]) -> Result<[u8; 5], TryFromSlice
 
     let mut block = Array::try_from(sample)?;
     cipher.encrypt_block(&mut block);
-    
+
     mask.copy_from_slice(&block[..5]);
     Ok(mask)
 }

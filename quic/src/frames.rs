@@ -25,7 +25,7 @@ pub enum Frame {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrameReaderError {
-    EOF,
+    UnexpectedEOF,
 }
 
 #[derive(Debug)]
