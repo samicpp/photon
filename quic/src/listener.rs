@@ -1,10 +1,10 @@
-use aes_gcm::{Aes128Gcm, aead::{Aead, Payload}};
+use aes_gcm::AeadInOut;
 use bytes::BytesMut;
-use cipher::{Array, BlockCipherEncrypt, KeyInit};
+use cipher::{Array, BlockCipherEncrypt};
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::net::UdpSocket;
 
-use crate::{decode_pn, gen_hp_mask, keys::derive_keys, read_varint};
+use crate::{decode_pn, keys::derive_keys, read_varint};
 
 
 pub struct QuicListener {
@@ -110,19 +110,25 @@ impl QuicListener {
                                 for i in 0..8 {
                                     nonce[i + 4] ^= pn_be[i];
                                 }
+                                let Ok(nonce) = nonce.as_ref().try_into() else { continue };
 
-                                let key: &cipher::Array<u8, _> = keys.client_key[..].try_into().unwrap(); // aes_gcm::Key::<Aes128Gcm>::from_slice(&keys.client_key);
-                                let cipher = Aes128Gcm::new(key);
-                                let nonce: &cipher::Array<u8, _> = nonce.as_ref().try_into().unwrap(); // Nonce::from_slice(&nonce);
+                                {
+                                    // let payload_range = off + 1 + dpnl as usize..off + length;
+                                    // let split_at = off + length - 16 - pos;
 
-                                
-                                let ciphertext = Payload { 
-                                    aad: &buff[pos..off + 1 + dpnl as usize],
-                                    msg: &buff[off + 1 + dpnl as usize..off + length], 
-                                };
-                                let decrypt = cipher.decrypt(nonce, ciphertext).unwrap();
+                                    let (aad_msg, tag) = (&mut buff[pos..off + length]).split_at_mut(off + length - 16 - pos);
+                                    let (aad, msg) = aad_msg.split_at_mut(off + 1 + dpnl as usize - pos);
+                                    let Ok(tag) = (&(*tag)).try_into() else { continue };
 
-                                let string = String::from_utf8_lossy(&decrypt);
+                                    let Ok(_) = keys.client_key_cipher.decrypt_inout_detached(
+                                        nonce, 
+                                        aad, 
+                                        msg.into(),
+                                        tag,
+                                    ) else { continue };
+                                }
+
+                                let string = String::from_utf8_lossy(&buff[off + 1 + dpnl as usize..off + length]);
                                 println!("{string}");
 
                                 // println!("ty = {ty}, pnl = {pnl}, version = {version}");

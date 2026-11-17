@@ -1,4 +1,5 @@
 use aes::Aes128;
+use aes_gcm::Aes128Gcm;
 use cipher::KeyInit;
 use hkdf::Hkdf;
 use sha2::Sha256;
@@ -18,15 +19,17 @@ pub struct DerivedKeys {
     // pub initial: sha2::digest::Output<Sha256>,
     
     // pub client_initial: [u8; 32],
-    pub client_key: [u8; 16],
+    // pub client_key: [u8; 16],
     pub client_iv: [u8; 12],
     // pub client_hp: [u8; 16],
+    pub client_key_cipher: Aes128Gcm,
     pub client_hp_cipher: Aes128,
 
     // pub server_initial: [u8; 32],
-    pub server_key: [u8; 16],
+    // pub server_key: [u8; 16],
     pub server_iv: [u8; 12],
     // pub server_hp: [u8; 16],
+    pub server_key_cipher: Aes128Gcm,
     pub server_hp_cipher: Aes128,
 }
 
@@ -70,6 +73,9 @@ pub fn derive_keys(dcid: &[u8]) -> Option<DerivedKeys> {
     let server_hp = hkdf_expand::<16>(&server_initial, QUIC_HP)?;
 
 
+    let client_key_cipher = Aes128Gcm::new((&client_key).try_into().ok()?);
+    let server_key_cipher = Aes128Gcm::new((&server_key).try_into().ok()?);
+    
     let client_hp_cipher = Aes128::new((&client_hp).try_into().ok()?);
     let server_hp_cipher = Aes128::new((&server_hp).try_into().ok()?);
 
@@ -78,15 +84,17 @@ pub fn derive_keys(dcid: &[u8]) -> Option<DerivedKeys> {
         // initial, 
 
         // client_initial, 
-        client_key, 
+        // client_key, 
         client_iv, 
         // client_hp,
         client_hp_cipher,
+        client_key_cipher,
 
         // server_initial, 
-        server_key, 
+        // server_key, 
         server_iv, 
         // server_hp 
         server_hp_cipher,
+        server_key_cipher,
     })
 }
